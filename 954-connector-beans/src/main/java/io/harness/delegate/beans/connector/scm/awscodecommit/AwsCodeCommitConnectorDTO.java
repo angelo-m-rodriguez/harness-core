@@ -12,6 +12,7 @@ import io.harness.connector.DelegateSelectable;
 import io.harness.delegate.beans.connector.ConnectorConfigDTO;
 import io.harness.delegate.beans.connector.ConnectorType;
 import io.harness.delegate.beans.connector.scm.ScmConnector;
+import io.harness.git.GitClientHelper;
 import io.harness.gitsync.beans.GitRepositoryDTO;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -44,6 +45,7 @@ public class AwsCodeCommitConnectorDTO extends ConnectorConfigDTO implements Scm
   @NotNull @NotBlank String url;
   @Valid @NotNull AwsCodeCommitAuthenticationDTO authentication;
   Set<String> delegateSelectors;
+  String gitConnectionUrl;
 
   @Builder
   public AwsCodeCommitConnectorDTO(
@@ -80,5 +82,15 @@ public class AwsCodeCommitConnectorDTO extends ConnectorConfigDTO implements Scm
   @Override
   public GitRepositoryDTO getGitRepositoryDetails() {
     return GitRepositoryDTO.builder().build();
+  }
+
+  @Override
+  public String getFileUrl(String branchName, String filePath, String repoName) {
+    return "";
+  }
+
+  @Override
+  public void validate() {
+    GitClientHelper.validateURL(url);
   }
 }

@@ -43,6 +43,7 @@ import static org.apache.commons.codec.binary.Hex.encodeHexString;
 import io.harness.annotations.dev.OwnedBy;
 import io.harness.exception.GitClientException;
 import io.harness.exception.GitConnectionDelegateException;
+import io.harness.exception.InvalidRequestException;
 import io.harness.exception.NonPersistentLockException;
 import io.harness.exception.YamlException;
 import io.harness.filesystem.FileIo;
@@ -75,6 +76,7 @@ import org.eclipse.jgit.api.errors.RefNotFoundException;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.errors.TransportException;
+import org.jetbrains.annotations.NotNull;
 
 @OwnedBy(CDP)
 @Singleton
@@ -88,6 +90,7 @@ public class GitClientHelper {
   private static final Integer OWNER_GROUP = 5;
   private static final Integer REPO_GROUP = 6;
   private static final Integer SCM_GROUP = 3;
+  private static final Integer PROTOCOL_GROUP = 1;
 
   static {
     try {
@@ -127,6 +130,19 @@ public class GitClientHelper {
     }
   }
 
+  public static String getGitProtocol(String url) {
+    Matcher m = GIT_URL.matcher(url);
+    try {
+      if (m.find()) {
+        return m.toMatchResult().group(PROTOCOL_GROUP);
+      } else {
+        throw new GitClientException(format("Invalid git repo url  %s", url), SRE);
+      }
+    } catch (Exception e) {
+      throw new GitClientException(format("Failed to parse protocol from git url  %s", url), SRE, e);
+    }
+  }
+
   public static String getGitOwner(String url, boolean isAccountLevelConnector) {
     if (!url.endsWith("/") && isAccountLevelConnector) {
       url += "/";
@@ -146,6 +162,16 @@ public class GitClientHelper {
     } catch (Exception e) {
       throw new GitClientException(format("Failed to parse owner from git url  %s", url), SRE);
     }
+  }
+
+  public static boolean isHTTPProtocol(String url) {
+    String protocol = getGitProtocol(url);
+    return protocol.equals("http") || protocol.equals("https");
+  }
+
+  public static boolean isSSHProtocol(String url) {
+    String protocol = getGitProtocol(url);
+    return protocol.equals("git") || protocol.equals("ssh");
   }
 
   public static boolean isGithubSAAS(String url) {
@@ -451,5 +477,14 @@ public class GitClientHelper {
         unhandled(gitDiffChangeType);
     }
     return null;
+  }
+
+  public static void validateURL(@NotNull String url) {
+    Matcher m = GIT_URL_NO_OWNER.matcher(url);
+    log.info("url==" + url);
+    if (!(m.find())) {
+      throw new InvalidRequestException(
+          format("Invalid repo url  %s,should start with either http:// , https:// , ssh:// or git@", url));
+    }
   }
 }

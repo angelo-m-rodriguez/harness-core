@@ -44,7 +44,6 @@ public class EnvironmentYamlV2 implements Visitable {
   @ApiModelProperty(hidden = true)
   private String uuid;
 
-  // For New Service Yaml
   @NotNull
   @ApiModelProperty(dataType = SwaggerConstants.STRING_CLASSPATH)
   @Pattern(regexp = NGRegexValidatorConstants.RUNTIME_OR_FIXED_IDENTIFIER_PATTERN)
@@ -54,6 +53,10 @@ public class EnvironmentYamlV2 implements Visitable {
 
   // environmentInputs
   Map<String, Object> environmentInputs;
+  Map<String, Object> serviceOverrideInputs;
+  @NotNull boolean deployToAll;
+  List<ClusterYaml> gitOpsClusters;
 
-  List<ClusterYaml> gitopsClusters;
+  // For Visitor Framework Impl
+  @Getter(onMethod_ = { @ApiModelProperty(hidden = true) }) @ApiModelProperty(hidden = true) String metadata;
 }

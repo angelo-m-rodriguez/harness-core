@@ -10,6 +10,7 @@ package io.harness.cvng.servicelevelobjective.services.impl;
 import static io.harness.cvng.notification.utils.NotificationRuleCommonUtils.COOL_OFF_DURATION;
 import static io.harness.cvng.notification.utils.NotificationRuleCommonUtils.getNotificationTemplateData;
 import static io.harness.cvng.notification.utils.NotificationRuleCommonUtils.getNotificationTemplateId;
+import static io.harness.data.structure.EmptyPredicate.isEmpty;
 import static io.harness.data.structure.EmptyPredicate.isNotEmpty;
 
 import io.harness.cvng.beans.cvnglog.CVNGLogDTO;
@@ -20,12 +21,16 @@ import io.harness.cvng.core.services.api.CVNGLogService;
 import io.harness.cvng.core.services.api.VerificationTaskService;
 import io.harness.cvng.core.services.api.monitoredService.MonitoredServiceService;
 import io.harness.cvng.core.utils.DateTimeUtils;
+import io.harness.cvng.events.servicelevelobjective.ServiceLevelObjectiveCreateEvent;
+import io.harness.cvng.events.servicelevelobjective.ServiceLevelObjectiveDeleteEvent;
+import io.harness.cvng.events.servicelevelobjective.ServiceLevelObjectiveUpdateEvent;
 import io.harness.cvng.notification.beans.NotificationRuleConditionType;
 import io.harness.cvng.notification.beans.NotificationRuleRef;
 import io.harness.cvng.notification.beans.NotificationRuleRefDTO;
 import io.harness.cvng.notification.beans.NotificationRuleResponse;
-import io.harness.cvng.notification.channelDetails.CVNGNotificationChannel;
+import io.harness.cvng.notification.beans.NotificationRuleType;
 import io.harness.cvng.notification.entities.NotificationRule;
+import io.harness.cvng.notification.entities.NotificationRule.CVNGNotificationChannel;
 import io.harness.cvng.notification.entities.SLONotificationRule;
 import io.harness.cvng.notification.entities.SLONotificationRule.SLOErrorBudgetBurnRateCondition;
 import io.harness.cvng.notification.entities.SLONotificationRule.SLONotificationRuleCondition;
@@ -60,6 +65,7 @@ import io.harness.ng.beans.PageResponse;
 import io.harness.ng.core.mapper.TagMapper;
 import io.harness.notification.notificationclient.NotificationClient;
 import io.harness.notification.notificationclient.NotificationResult;
+import io.harness.outbox.api.OutboxService;
 import io.harness.persistence.HPersistence;
 import io.harness.utils.PageUtils;
 
@@ -104,6 +110,8 @@ public class ServiceLevelObjectiveServiceImpl implements ServiceLevelObjectiveSe
   @Inject private NotificationRuleService notificationRuleService;
   @Inject private NotificationClient notificationClient;
 
+  @Inject private OutboxService outboxService;
+
   private static final String templateIdentifierName = "sloName";
 
   @Override
@@ -112,6 +120,14 @@ public class ServiceLevelObjectiveServiceImpl implements ServiceLevelObjectiveSe
     validateCreate(serviceLevelObjectiveDTO, projectParams);
     ServiceLevelObjective serviceLevelObjective =
         saveServiceLevelObjectiveEntity(projectParams, serviceLevelObjectiveDTO);
+    outboxService.save(ServiceLevelObjectiveCreateEvent.builder()
+                           .resourceName(serviceLevelObjectiveDTO.getName())
+                           .newServiceLevelObjectiveDTO(serviceLevelObjectiveDTO)
+                           .accountIdentifier(projectParams.getAccountIdentifier())
+                           .serviceLevelObjectiveIdentifier(serviceLevelObjectiveDTO.getIdentifier())
+                           .orgIdentifier(projectParams.getOrgIdentifier())
+                           .projectIdentifier(projectParams.getProjectIdentifier())
+                           .build());
     sloHealthIndicatorService.upsert(serviceLevelObjective);
     return getSLOResponse(serviceLevelObjectiveDTO.getIdentifier(), projectParams);
   }
@@ -129,10 +145,21 @@ public class ServiceLevelObjectiveServiceImpl implements ServiceLevelObjectiveSe
           serviceLevelObjectiveDTO.getIdentifier(), projectParams.getAccountIdentifier(),
           projectParams.getOrgIdentifier(), projectParams.getProjectIdentifier()));
     }
+    ServiceLevelObjectiveDTO existingServiceLevelObjective =
+        serviceLevelObjectiveToServiceLevelObjectiveDTO(serviceLevelObjective);
     validate(serviceLevelObjectiveDTO, projectParams);
     serviceLevelObjective = updateSLOEntity(projectParams, serviceLevelObjective, serviceLevelObjectiveDTO);
     sloHealthIndicatorService.upsert(serviceLevelObjective);
     sloErrorBudgetResetService.clearErrorBudgetResets(projectParams, identifier);
+    outboxService.save(ServiceLevelObjectiveUpdateEvent.builder()
+                           .resourceName(serviceLevelObjectiveDTO.getName())
+                           .oldServiceLevelObjectiveDTO(existingServiceLevelObjective)
+                           .newServiceLevelObjectiveDTO(serviceLevelObjectiveDTO)
+                           .accountIdentifier(projectParams.getAccountIdentifier())
+                           .serviceLevelObjectiveIdentifier(serviceLevelObjectiveDTO.getIdentifier())
+                           .orgIdentifier(projectParams.getOrgIdentifier())
+                           .projectIdentifier(projectParams.getProjectIdentifier())
+                           .build());
     return getSLOResponse(serviceLevelObjectiveDTO.getIdentifier(), projectParams);
   }
 
@@ -153,6 +180,16 @@ public class ServiceLevelObjectiveServiceImpl implements ServiceLevelObjectiveSe
             .stream()
             .map(ref -> ref.getNotificationRuleRef())
             .collect(Collectors.toList()));
+    ServiceLevelObjectiveDTO serviceLevelObjectiveDTO =
+        serviceLevelObjectiveToServiceLevelObjectiveDTO(serviceLevelObjective);
+    outboxService.save(ServiceLevelObjectiveDeleteEvent.builder()
+                           .resourceName(serviceLevelObjectiveDTO.getName())
+                           .oldServiceLevelObjectiveDTO(serviceLevelObjectiveDTO)
+                           .accountIdentifier(projectParams.getAccountIdentifier())
+                           .serviceLevelObjectiveIdentifier(serviceLevelObjectiveDTO.getIdentifier())
+                           .orgIdentifier(projectParams.getOrgIdentifier())
+                           .projectIdentifier(projectParams.getProjectIdentifier())
+                           .build());
     return hPersistence.delete(serviceLevelObjective);
   }
 
@@ -248,6 +285,19 @@ public class ServiceLevelObjectiveServiceImpl implements ServiceLevelObjectiveSe
       sloQuery.filter(ServiceLevelObjectiveKeys.monitoredServiceIdentifier, filter.monitoredServiceIdentifier);
     }
     List<ServiceLevelObjective> serviceLevelObjectiveList = sloQuery.asList();
+    if (filter.getNotificationRuleRef() != null) {
+      serviceLevelObjectiveList =
+          serviceLevelObjectiveList.stream()
+              .filter(slo
+                  -> slo.getNotificationRuleRefs()
+                          .stream()
+                          .filter(notificationRuleRef
+                              -> notificationRuleRef.getNotificationRuleRef().equals(filter.getNotificationRuleRef()))
+                          .collect(Collectors.toList())
+                          .size()
+                      > 0)
+              .collect(Collectors.toList());
+    }
     if (isNotEmpty(filter.getErrorBudgetRisks())) {
       List<SLOHealthIndicator> sloHealthIndicators = sloHealthIndicatorService.getBySLOIdentifiers(projectParams,
           serviceLevelObjectiveList.stream()
@@ -386,14 +436,14 @@ public class ServiceLevelObjectiveServiceImpl implements ServiceLevelObjectiveSe
 
   @Override
   public void sendNotification(ServiceLevelObjective serviceLevelObjective) {
+    ProjectParams projectParams = ProjectParams.builder()
+                                      .accountIdentifier(serviceLevelObjective.getAccountId())
+                                      .orgIdentifier(serviceLevelObjective.getOrgIdentifier())
+                                      .projectIdentifier(serviceLevelObjective.getProjectIdentifier())
+                                      .build();
     List<NotificationRule> notificationRules = getNotificationRules(serviceLevelObjective);
     Map<String, String> templateData =
-        getNotificationTemplateData(ProjectParams.builder()
-                                        .accountIdentifier(serviceLevelObjective.getAccountId())
-                                        .orgIdentifier(serviceLevelObjective.getOrgIdentifier())
-                                        .projectIdentifier(serviceLevelObjective.getProjectIdentifier())
-                                        .build(),
-            templateIdentifierName, serviceLevelObjective.getName());
+        getNotificationTemplateData(projectParams, templateIdentifierName, serviceLevelObjective.getName());
     Set<String> notificationRuleRefsWithChange = new HashSet<>();
 
     for (NotificationRule notificationRule : notificationRules) {
@@ -403,21 +453,30 @@ public class ServiceLevelObjectiveServiceImpl implements ServiceLevelObjectiveSe
           CVNGNotificationChannel notificationChannel = notificationRule.getNotificationMethod();
           String templateId = getNotificationTemplateId(notificationRule.getType(), notificationChannel.getType());
           NotificationResult notificationResult =
-              notificationClient.sendNotificationAsync(notificationChannel.getSpec().toNotificationChannel(
+              notificationClient.sendNotificationAsync(notificationChannel.toNotificationChannel(
                   serviceLevelObjective.getAccountId(), serviceLevelObjective.getOrgIdentifier(),
                   serviceLevelObjective.getProjectIdentifier(), templateId, templateData));
-          log.info("Notification with Notification ID {} sent", notificationResult.getNotificationId());
+          log.info("Notification with Notification ID {}, Notification Rule {}, Condition {} for SLO {} sent",
+              notificationResult.getNotificationId(), notificationRule.getName(), condition.getType().getDisplayName(),
+              serviceLevelObjective.getName());
           notificationRuleRefsWithChange.add(notificationRule.getIdentifier());
         }
       }
     }
-    updateNotificationRuleRefInSLO(serviceLevelObjective, new ArrayList<>(notificationRuleRefsWithChange));
+    updateNotificationRuleRefInSLO(
+        projectParams, serviceLevelObjective, new ArrayList<>(notificationRuleRefsWithChange));
   }
 
   @Override
   public PageResponse<NotificationRuleResponse> getNotificationRules(
       ProjectParams projectParams, String sloIdentifier, PageParams pageParams) {
     ServiceLevelObjective serviceLevelObjective = getEntity(projectParams, sloIdentifier);
+    if (serviceLevelObjective == null) {
+      throw new InvalidRequestException(String.format(
+          "SLO  with identifier %s, accountId %s, orgIdentifier %s and projectIdentifier %s  is not present",
+          sloIdentifier, projectParams.getAccountIdentifier(), projectParams.getOrgIdentifier(),
+          projectParams.getProjectIdentifier()));
+    }
     List<NotificationRuleRef> notificationRuleRefList = serviceLevelObjective.getNotificationRuleRefs();
     List<NotificationRuleResponse> notificationRuleResponseList =
         notificationRuleService.getNotificationRuleResponse(projectParams, notificationRuleRefList);
@@ -434,8 +493,19 @@ public class ServiceLevelObjectiveServiceImpl implements ServiceLevelObjectiveSe
         .build();
   }
 
+  @Override
+  public void beforeNotificationRuleDelete(ProjectParams projectParams, String notificationRuleRef) {
+    List<ServiceLevelObjective> serviceLevelObjectives =
+        get(projectParams, Filter.builder().notificationRuleRef(notificationRuleRef).build());
+    Preconditions.checkArgument(isEmpty(serviceLevelObjectives),
+        "Deleting notification rule is used in SLOs, "
+            + "Please delete the notification rule inside SLOs before deleting notification rule. SLOs : "
+            + String.join(
+                ", ", serviceLevelObjectives.stream().map(slo -> slo.getName()).collect(Collectors.toList())));
+  }
+
   private void updateNotificationRuleRefInSLO(
-      ServiceLevelObjective serviceLevelObjective, List<String> notificationRuleRefs) {
+      ProjectParams projectParams, ServiceLevelObjective serviceLevelObjective, List<String> notificationRuleRefs) {
     List<NotificationRuleRef> allNotificationRuleRefs = new ArrayList<>();
     List<NotificationRuleRef> notificationRuleRefsWithoutChange =
         serviceLevelObjective.getNotificationRuleRefs()
@@ -447,8 +517,8 @@ public class ServiceLevelObjectiveServiceImpl implements ServiceLevelObjectiveSe
             .map(notificationRuleRef
                 -> NotificationRuleRefDTO.builder().notificationRuleRef(notificationRuleRef).enabled(true).build())
             .collect(Collectors.toList());
-    List<NotificationRuleRef> notificationRuleRefsWithChange =
-        notificationRuleService.getNotificationRuleRefs(notificationRuleRefDTOs);
+    List<NotificationRuleRef> notificationRuleRefsWithChange = notificationRuleService.getNotificationRuleRefs(
+        projectParams, notificationRuleRefDTOs, NotificationRuleType.SLO, clock.instant());
     allNotificationRuleRefs.addAll(notificationRuleRefsWithChange);
     allNotificationRuleRefs.addAll(notificationRuleRefsWithoutChange);
     UpdateOperations<ServiceLevelObjective> updateOperations =
@@ -505,9 +575,34 @@ public class ServiceLevelObjectiveServiceImpl implements ServiceLevelObjectiveSe
     updateOperations.set(
         ServiceLevelObjectiveKeys.sloTargetPercentage, serviceLevelObjectiveDTO.getTarget().getSloTargetPercentage());
     updateOperations.set(ServiceLevelObjectiveKeys.notificationRuleRefs,
-        notificationRuleService.getNotificationRuleRefs(serviceLevelObjectiveDTO.getNotificationRuleRefs()));
+        getNotificationRuleRefs(projectParams, serviceLevelObjective, serviceLevelObjectiveDTO));
     hPersistence.update(serviceLevelObjective, updateOperations);
     return serviceLevelObjective;
+  }
+
+  private List<NotificationRuleRef> getNotificationRuleRefs(ProjectParams projectParams,
+      ServiceLevelObjective serviceLevelObjective, ServiceLevelObjectiveDTO serviceLevelObjectiveDTO) {
+    List<NotificationRuleRef> notificationRuleRefs = notificationRuleService.getNotificationRuleRefs(projectParams,
+        serviceLevelObjectiveDTO.getNotificationRuleRefs(), NotificationRuleType.SLO, Instant.ofEpochSecond(0));
+    deleteNotificationRuleRefs(projectParams, serviceLevelObjective, notificationRuleRefs);
+    return notificationRuleRefs;
+  }
+
+  private void deleteNotificationRuleRefs(ProjectParams projectParams, ServiceLevelObjective serviceLevelObjective,
+      List<NotificationRuleRef> notificationRuleRefs) {
+    List<String> existingNotificationRuleRefs = serviceLevelObjective.getNotificationRuleRefs()
+                                                    .stream()
+                                                    .map(NotificationRuleRef::getNotificationRuleRef)
+                                                    .collect(Collectors.toList());
+    List<String> updatedNotificationRuleRefs =
+        notificationRuleRefs.stream().map(NotificationRuleRef::getNotificationRuleRef).collect(Collectors.toList());
+    List<String> toBeDeletedNotificationRuleRefs = new ArrayList<>();
+    for (String notificationRuleRef : existingNotificationRuleRefs) {
+      if (!updatedNotificationRuleRefs.contains(notificationRuleRef)) {
+        toBeDeletedNotificationRuleRefs.add(notificationRuleRef);
+      }
+    }
+    notificationRuleService.delete(projectParams, toBeDeletedNotificationRuleRefs);
   }
 
   private ServiceLevelObjectiveResponse getSLOResponse(String identifier, ProjectParams projectParams) {
@@ -517,33 +612,8 @@ public class ServiceLevelObjectiveServiceImpl implements ServiceLevelObjectiveSe
   }
 
   private ServiceLevelObjectiveResponse sloEntityToSLOResponse(ServiceLevelObjective serviceLevelObjective) {
-    ProjectParams projectParams = ProjectParams.builder()
-                                      .accountIdentifier(serviceLevelObjective.getAccountId())
-                                      .orgIdentifier(serviceLevelObjective.getOrgIdentifier())
-                                      .projectIdentifier(serviceLevelObjective.getProjectIdentifier())
-                                      .build();
     ServiceLevelObjectiveDTO serviceLevelObjectiveDTO =
-        ServiceLevelObjectiveDTO.builder()
-            .orgIdentifier(serviceLevelObjective.getOrgIdentifier())
-            .projectIdentifier(serviceLevelObjective.getProjectIdentifier())
-            .identifier(serviceLevelObjective.getIdentifier())
-            .name(serviceLevelObjective.getName())
-            .description(serviceLevelObjective.getDesc())
-            .monitoredServiceRef(serviceLevelObjective.getMonitoredServiceIdentifier())
-            .healthSourceRef(serviceLevelObjective.getHealthSourceIdentifier())
-            .serviceLevelIndicators(
-                serviceLevelIndicatorService.get(projectParams, serviceLevelObjective.getServiceLevelIndicators()))
-            .notificationRuleRefs(
-                notificationRuleService.getNotificationRuleRefDTOs(serviceLevelObjective.getNotificationRuleRefs()))
-            .target(SLOTarget.builder()
-                        .type(serviceLevelObjective.getSloTarget().getType())
-                        .spec(sloTargetTypeSLOTargetTransformerMap.get(serviceLevelObjective.getSloTarget().getType())
-                                  .getSLOTargetSpec(serviceLevelObjective.getSloTarget()))
-                        .sloTargetPercentage(serviceLevelObjective.getSloTargetPercentage())
-                        .build())
-            .tags(TagMapper.convertToMap(serviceLevelObjective.getTags()))
-            .userJourneyRef(serviceLevelObjective.getUserJourneyIdentifier())
-            .build();
+        serviceLevelObjectiveToServiceLevelObjectiveDTO(serviceLevelObjective);
     return ServiceLevelObjectiveResponse.builder()
         .serviceLevelObjectiveDTO(serviceLevelObjectiveDTO)
         .createdAt(serviceLevelObjective.getCreatedAt())
@@ -565,8 +635,8 @@ public class ServiceLevelObjectiveServiceImpl implements ServiceLevelObjectiveSe
             .serviceLevelIndicators(serviceLevelIndicatorService.create(projectParams,
                 serviceLevelObjectiveDTO.getServiceLevelIndicators(), serviceLevelObjectiveDTO.getIdentifier(),
                 serviceLevelObjectiveDTO.getMonitoredServiceRef(), serviceLevelObjectiveDTO.getHealthSourceRef()))
-            .notificationRuleRefs(
-                notificationRuleService.getNotificationRuleRefs(serviceLevelObjectiveDTO.getNotificationRuleRefs()))
+            .notificationRuleRefs(notificationRuleService.getNotificationRuleRefs(projectParams,
+                serviceLevelObjectiveDTO.getNotificationRuleRefs(), NotificationRuleType.SLO, Instant.ofEpochSecond(0)))
             .monitoredServiceIdentifier(serviceLevelObjectiveDTO.getMonitoredServiceRef())
             .healthSourceIdentifier(serviceLevelObjectiveDTO.getHealthSourceRef())
             .tags(TagMapper.convertToList(serviceLevelObjectiveDTO.getTags()))
@@ -592,6 +662,36 @@ public class ServiceLevelObjectiveServiceImpl implements ServiceLevelObjectiveSe
     monitoredServiceService.get(projectParams, sloCreateDTO.getMonitoredServiceRef());
   }
 
+  public ServiceLevelObjectiveDTO serviceLevelObjectiveToServiceLevelObjectiveDTO(
+      ServiceLevelObjective serviceLevelObjective) {
+    ProjectParams projectParams = ProjectParams.builder()
+                                      .accountIdentifier(serviceLevelObjective.getAccountId())
+                                      .orgIdentifier(serviceLevelObjective.getOrgIdentifier())
+                                      .projectIdentifier(serviceLevelObjective.getProjectIdentifier())
+                                      .build();
+    return ServiceLevelObjectiveDTO.builder()
+        .orgIdentifier(serviceLevelObjective.getOrgIdentifier())
+        .projectIdentifier(serviceLevelObjective.getProjectIdentifier())
+        .identifier(serviceLevelObjective.getIdentifier())
+        .name(serviceLevelObjective.getName())
+        .description(serviceLevelObjective.getDesc())
+        .monitoredServiceRef(serviceLevelObjective.getMonitoredServiceIdentifier())
+        .healthSourceRef(serviceLevelObjective.getHealthSourceIdentifier())
+        .serviceLevelIndicators(
+            serviceLevelIndicatorService.get(projectParams, serviceLevelObjective.getServiceLevelIndicators()))
+        .notificationRuleRefs(
+            notificationRuleService.getNotificationRuleRefDTOs(serviceLevelObjective.getNotificationRuleRefs()))
+        .target(SLOTarget.builder()
+                    .type(serviceLevelObjective.getSloTarget().getType())
+                    .spec(sloTargetTypeSLOTargetTransformerMap.get(serviceLevelObjective.getSloTarget().getType())
+                              .getSLOTargetSpec(serviceLevelObjective.getSloTarget()))
+                    .sloTargetPercentage(serviceLevelObjective.getSloTargetPercentage())
+                    .build())
+        .tags(TagMapper.convertToMap(serviceLevelObjective.getTags()))
+        .userJourneyRef(serviceLevelObjective.getUserJourneyIdentifier())
+        .build();
+  }
+
   @Value
   @Builder
   private static class Filter {
@@ -601,5 +701,6 @@ public class ServiceLevelObjectiveServiceImpl implements ServiceLevelObjectiveSe
     List<SLOTargetType> targetTypes;
     List<ErrorBudgetRisk> errorBudgetRisks;
     String monitoredServiceIdentifier;
+    String notificationRuleRef;
   }
 }

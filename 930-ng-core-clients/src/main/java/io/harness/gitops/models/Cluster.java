@@ -8,12 +8,27 @@
 package io.harness.gitops.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import lombok.Builder;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
+import lombok.Value;
 
 @Data
-@Builder
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Cluster {
   String identifier;
+  @JsonProperty("cluster") ClusterInternal clusterInternal;
+
+  public Cluster(String identifier, String name) {
+    this.identifier = identifier;
+    this.clusterInternal = new ClusterInternal(name);
+  }
+
+  public String name() {
+    return clusterInternal.getName();
+  }
+
+  @Value
+  private static class ClusterInternal {
+    String name;
+  }
 }

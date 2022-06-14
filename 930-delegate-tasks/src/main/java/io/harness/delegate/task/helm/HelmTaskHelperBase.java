@@ -15,6 +15,7 @@ import static io.harness.data.structure.UUIDGenerator.convertBase64UuidToCanonic
 import static io.harness.data.structure.UUIDGenerator.generateUuid;
 import static io.harness.delegate.beans.storeconfig.StoreDelegateConfigType.GCS_HELM;
 import static io.harness.delegate.beans.storeconfig.StoreDelegateConfigType.HTTP_HELM;
+import static io.harness.delegate.beans.storeconfig.StoreDelegateConfigType.OCI_HELM;
 import static io.harness.delegate.beans.storeconfig.StoreDelegateConfigType.S3_HELM;
 import static io.harness.exception.WingsException.USER;
 import static io.harness.filesystem.FileIo.createDirectoryIfDoesNotExist;
@@ -33,15 +34,15 @@ import static io.harness.helm.HelmConstants.V3Commands.HELM_CACHE_HOME;
 import static io.harness.helm.HelmConstants.V3Commands.HELM_CACHE_HOME_PATH;
 import static io.harness.helm.HelmConstants.V3Commands.HELM_REPO_ADD_FORCE_UPDATE;
 import static io.harness.helm.HelmConstants.V3Commands.HELM_REPO_FLAGS;
-import static io.harness.helm.HelmConstants.VALUES_YAML;
 import static io.harness.helm.HelmConstants.WORKING_DIR_BASE;
 import static io.harness.k8s.kubectl.Utils.encloseWithQuotesIfNeeded;
-import static io.harness.logging.LogLevel.INFO;
+import static io.harness.logging.LogLevel.ERROR;
 import static io.harness.logging.LogLevel.WARN;
 
 import static software.wings.beans.LogColor.White;
 import static software.wings.beans.LogHelper.color;
 import static software.wings.beans.LogWeight.Bold;
+import static software.wings.delegatetasks.helm.HelmTaskHelper.REGISTRY_URL_PREFIX;
 
 import static java.lang.String.format;
 import static org.apache.commons.lang3.StringUtils.EMPTY;
@@ -55,8 +56,12 @@ import io.harness.chartmuseum.ChartmuseumClient;
 import io.harness.delegate.beans.connector.helm.HttpHelmAuthType;
 import io.harness.delegate.beans.connector.helm.HttpHelmConnectorDTO;
 import io.harness.delegate.beans.connector.helm.HttpHelmUsernamePasswordDTO;
+import io.harness.delegate.beans.connector.helm.OciHelmAuthType;
+import io.harness.delegate.beans.connector.helm.OciHelmConnectorDTO;
+import io.harness.delegate.beans.connector.helm.OciHelmUsernamePasswordDTO;
 import io.harness.delegate.beans.storeconfig.GcsHelmStoreDelegateConfig;
 import io.harness.delegate.beans.storeconfig.HttpHelmStoreDelegateConfig;
+import io.harness.delegate.beans.storeconfig.OciHelmStoreDelegateConfig;
 import io.harness.delegate.beans.storeconfig.S3HelmStoreDelegateConfig;
 import io.harness.delegate.beans.storeconfig.StoreDelegateConfig;
 import io.harness.delegate.chartmuseum.NgChartmuseumClientFactory;
@@ -75,12 +80,10 @@ import io.harness.helm.HelmSubCommandType;
 import io.harness.k8s.K8sGlobalConfigService;
 import io.harness.k8s.manifest.ObjectYamlUtils;
 import io.harness.k8s.model.HelmVersion;
+import io.harness.logging.CommandExecutionStatus;
 import io.harness.logging.LogCallback;
 import io.harness.security.encryption.SecretDecryptionService;
 import io.harness.utils.FieldWithPlainTextOrSecretValueHelper;
-
-import software.wings.beans.LogColor;
-import software.wings.beans.LogWeight;
 
 import com.esotericsoftware.yamlbeans.YamlException;
 import com.google.common.util.concurrent.UncheckedTimeoutException;
@@ -93,7 +96,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -524,22 +529,7 @@ public class HelmTaskHelperBase {
     String username = getHttpHelmUsername(httpHelmConnector);
     char[] password = getHttpHelmPassword(httpHelmConnector);
 
-    String cacheDir = "";
-    if (manifest.isUseRepoFlags()) {
-      if (manifest.isDeleteRepoCacheDir()) {
-        cacheDir = Paths
-                       .get(RESOURCE_DIR_BASE, storeDelegateConfig.getRepoName(),
-                           RandomStringUtils.randomAlphabetic(5).toLowerCase(Locale.ROOT), "cache")
-                       .toAbsolutePath()
-                       .normalize()
-                       .toString();
-      } else {
-        cacheDir = Paths.get(RESOURCE_DIR_BASE, storeDelegateConfig.getRepoName(), "cache")
-                       .toAbsolutePath()
-                       .normalize()
-                       .toString();
-      }
-    }
+    String cacheDir = getCacheDir(manifest, storeDelegateConfig.getRepoName());
 
     try {
       addRepo(storeDelegateConfig.getRepoName(), storeDelegateConfig.getRepoDisplayName(),
@@ -558,6 +548,55 @@ public class HelmTaskHelperBase {
         }
       }
     }
+  }
+
+  public void downloadChartFilesFromOciRepo(
+      HelmChartManifestDelegateConfig manifest, String destinationDirectory, long timeoutInMillis) {
+    if (!(manifest.getStoreDelegateConfig() instanceof OciHelmStoreDelegateConfig)) {
+      throw new InvalidArgumentsException(
+          Pair.of("storeDelegateConfig", "Must be instance of OciHelmStoreDelegateConfig"));
+    }
+
+    OciHelmStoreDelegateConfig storeDelegateConfig = (OciHelmStoreDelegateConfig) manifest.getStoreDelegateConfig();
+    OciHelmConnectorDTO ociHelmConnector = storeDelegateConfig.getOciHelmConnector();
+
+    String cacheDir = getCacheDir(manifest, storeDelegateConfig.getRepoName());
+
+    try {
+      loginOciRegistry(ociHelmConnector.getHelmRepoUrl(), getOciHelmUsername(ociHelmConnector),
+          getOciHelmPassword(ociHelmConnector), HelmVersion.V380, timeoutInMillis, destinationDirectory);
+      String repoName = String.format(REGISTRY_URL_PREFIX,
+          Paths.get(ociHelmConnector.getHelmRepoUrl(), storeDelegateConfig.getBasePath()).normalize());
+      fetchChartFromRepo(repoName, storeDelegateConfig.getRepoDisplayName(), manifest.getChartName(),
+          manifest.getChartVersion(), destinationDirectory, HelmVersion.V380, manifest.getHelmCommandFlag(),
+          timeoutInMillis, manifest.isCheckIncorrectChartVersion(), cacheDir);
+    } finally {
+      if (manifest.isUseRepoFlags() && manifest.isDeleteRepoCacheDir()) {
+        try {
+          FileUtils.forceDelete(new File(cacheDir));
+        } catch (IOException ie) {
+          log.error("Deletion of charts folder failed due to : {}",
+              ExceptionMessageSanitizer.sanitizeException(ie).getMessage());
+        }
+      }
+    }
+  }
+
+  private String getCacheDir(HelmChartManifestDelegateConfig manifest, String repoName) {
+    String cacheDir = "";
+    if (manifest.isUseRepoFlags()) {
+      if (manifest.isDeleteRepoCacheDir()) {
+        cacheDir = Paths
+                       .get(RESOURCE_DIR_BASE, repoName, RandomStringUtils.randomAlphabetic(5).toLowerCase(Locale.ROOT),
+                           "cache")
+                       .toAbsolutePath()
+                       .normalize()
+                       .toString();
+      } else {
+        cacheDir = Paths.get(RESOURCE_DIR_BASE, repoName, "cache").toAbsolutePath().normalize().toString();
+      }
+    }
+    return cacheDir;
   }
 
   public void downloadChartFilesUsingChartMuseum(
@@ -583,19 +622,7 @@ public class HelmTaskHelperBase {
 
     repoName = repoName + "-" + bucketName;
 
-    String cacheDir = "";
-    if (manifest.isUseRepoFlags()) {
-      if (manifest.isDeleteRepoCacheDir()) {
-        cacheDir = Paths
-                       .get(RESOURCE_DIR_BASE, repoName, RandomStringUtils.randomAlphabetic(5).toLowerCase(Locale.ROOT),
-                           "cache")
-                       .toAbsolutePath()
-                       .normalize()
-                       .toString();
-      } else {
-        cacheDir = Paths.get(RESOURCE_DIR_BASE, repoName, "cache").toAbsolutePath().normalize().toString();
-      }
-    }
+    String cacheDir = getCacheDir(manifest, repoName);
 
     try {
       resourceDirectory = createNewDirectoryAtPath(RESOURCE_DIR_BASE);
@@ -716,6 +743,14 @@ public class HelmTaskHelperBase {
         chartRepoUrl = httpStoreDelegateConfig.getHttpHelmConnector().getHelmRepoUrl();
         break;
 
+      case OCI_HELM:
+        OciHelmStoreDelegateConfig ociStoreDelegateConfig =
+            (OciHelmStoreDelegateConfig) manifestDelegateConfig.getStoreDelegateConfig();
+        repoDisplayName = ociStoreDelegateConfig.getRepoDisplayName();
+        basePath = ociStoreDelegateConfig.getBasePath();
+        chartRepoUrl = ociStoreDelegateConfig.getOciHelmConnector().getHelmRepoUrl();
+        break;
+
       case S3_HELM:
         S3HelmStoreDelegateConfig s3HelmStoreDelegateConfig =
             (S3HelmStoreDelegateConfig) manifestDelegateConfig.getStoreDelegateConfig();
@@ -781,25 +816,39 @@ public class HelmTaskHelperBase {
     return Paths.get(parentDir, chartName).toString();
   }
 
-  public String fetchValuesYamlFromChart(HelmChartManifestDelegateConfig helmChartManifestDelegateConfig,
-      long timeoutInMillis, LogCallback logCallback) throws Exception {
-    logCallback.saveExecutionLog(color("\nStarting fetching Helm values", LogColor.White, LogWeight.Bold));
+  public Map<String, HelmFetchFileResult> fetchValuesYamlFromChart(
+      HelmChartManifestDelegateConfig helmChartManifestDelegateConfig, long timeoutInMillis, LogCallback logCallback,
+      List<HelmFetchFileConfig> helmFetchFileConfigList) throws Exception {
+    logCallback.saveExecutionLog(color("\nStarting fetching Helm values", White, Bold));
     String workingDirectory = createNewDirectoryAtPath(Paths.get(WORKING_DIR_BASE).toString());
     logCallback.saveExecutionLog(color("\nFetching values.yaml from helm chart repo", White, Bold));
 
     try {
       downloadHelmChartFiles(helmChartManifestDelegateConfig, workingDirectory, timeoutInMillis);
       printHelmChartInfoWithVersionInExecutionLogs(workingDirectory, helmChartManifestDelegateConfig, logCallback);
+      logCallback.saveExecutionLog(color("\nFollowing were fetched successfully :", White, Bold));
 
-      String valuesFileContent =
-          readValuesYamlFromChartFiles(workingDirectory, helmChartManifestDelegateConfig.getChartName());
-      if (null == valuesFileContent) {
-        logCallback.saveExecutionLog("No values.yaml found", WARN);
-      } else {
-        logCallback.saveExecutionLog("\nSuccessfully fetched values.yaml", INFO);
+      String chartDirectory = getChartDirectory(workingDirectory, helmChartManifestDelegateConfig.getChartName());
+      Map<String, HelmFetchFileResult> helmValueFetchFilesResultMap = new HashMap<>();
+      if (isNotEmpty(helmFetchFileConfigList)) {
+        for (HelmFetchFileConfig helmFetchFileConfig : helmFetchFileConfigList) {
+          try {
+            HelmFetchFileResult valuesFileContentList =
+                readValuesYamlFromChartFiles(chartDirectory, helmFetchFileConfig, logCallback);
+            String identifier = helmFetchFileConfig.getIdentifier();
+            if (helmValueFetchFilesResultMap.containsKey(identifier)) {
+              helmValueFetchFilesResultMap.get(identifier).addAllFrom(valuesFileContentList);
+            } else {
+              helmValueFetchFilesResultMap.put(identifier, valuesFileContentList);
+            }
+          } catch (Exception ex) {
+            String errorMsg = format("Failed to fetch yaml file from %s manifest", helmFetchFileConfig.getIdentifier());
+            logCallback.saveExecutionLog(errorMsg + ExceptionUtils.getMessage(ex), WARN);
+            throw ex;
+          }
+        }
       }
-
-      return valuesFileContent;
+      return helmValueFetchFilesResultMap;
     } catch (HelmClientException ex) {
       String errorMsg = format("Failed to fetch values yaml from %s repo. ",
           helmChartManifestDelegateConfig.getStoreDelegateConfig().getType());
@@ -815,9 +864,33 @@ public class HelmTaskHelperBase {
     }
   }
 
-  private String readValuesYamlFromChartFiles(String workingDirectory, String chartName) throws Exception {
-    return new String(Files.readAllBytes(Paths.get(getChartDirectory(workingDirectory, chartName), VALUES_YAML)),
-        StandardCharsets.UTF_8);
+  private HelmFetchFileResult readValuesYamlFromChartFiles(
+      String chartDirectory, HelmFetchFileConfig helmFetchFileConfig, LogCallback logCallback) throws Exception {
+    List<String> valueFileContentList = new ArrayList<>();
+    try {
+      for (String path : helmFetchFileConfig.getFilePaths()) {
+        String valueFileContent =
+            new String(Files.readAllBytes(Paths.get(chartDirectory, path)), StandardCharsets.UTF_8);
+        valueFileContentList.add(valueFileContent);
+        logCallback.saveExecutionLog(format("- %s", path));
+      }
+    } catch (Exception ex) {
+      String exceptionMsg = ex.getMessage();
+
+      // Values.yaml in service spec is optional.
+      if (ex.getCause() instanceof NoSuchFileException && helmFetchFileConfig.isSucceedIfFileNotFound()) {
+        log.info("file not found. " + exceptionMsg, ex);
+        logCallback.saveExecutionLog(
+            color(format("No values.yaml found for manifest with identifier: %s.", helmFetchFileConfig.getIdentifier()),
+                White));
+      } else {
+        String msg = "Exception in processing HelmValuesFetchTask. " + exceptionMsg;
+        log.error(msg, ex);
+        logCallback.saveExecutionLog(msg, ERROR, CommandExecutionStatus.FAILURE);
+        throw ex;
+      }
+    }
+    return HelmFetchFileResult.builder().valuesFileContents(valueFileContentList).build();
   }
 
   private void downloadHelmChartFiles(HelmChartManifestDelegateConfig helmChartManifestDelegateConfig,
@@ -827,6 +900,8 @@ public class HelmTaskHelperBase {
 
     if (HTTP_HELM == helmStoreDelegateConfig.getType()) {
       downloadChartFilesFromHttpRepo(helmChartManifestDelegateConfig, destinationDirectory, timeoutInMillis);
+    } else if (OCI_HELM == helmStoreDelegateConfig.getType()) {
+      downloadChartFilesFromOciRepo(helmChartManifestDelegateConfig, destinationDirectory, timeoutInMillis);
     } else {
       downloadChartFilesUsingChartMuseum(helmChartManifestDelegateConfig, destinationDirectory, timeoutInMillis);
     }
@@ -848,6 +923,25 @@ public class HelmTaskHelperBase {
     }
 
     HttpHelmUsernamePasswordDTO creds = (HttpHelmUsernamePasswordDTO) httpHelmConnectorDTO.getAuth().getCredentials();
+    return creds.getPasswordRef().getDecryptedValue();
+  }
+
+  public String getOciHelmUsername(final OciHelmConnectorDTO ociHelmConnectorDTO) {
+    if (ociHelmConnectorDTO.getAuth().getAuthType() == OciHelmAuthType.ANONYMOUS) {
+      return null;
+    }
+
+    OciHelmUsernamePasswordDTO creds = (OciHelmUsernamePasswordDTO) ociHelmConnectorDTO.getAuth().getCredentials();
+    return FieldWithPlainTextOrSecretValueHelper.getSecretAsStringFromPlainTextOrSecretRef(
+        creds.getUsername(), creds.getUsernameRef());
+  }
+
+  public char[] getOciHelmPassword(final OciHelmConnectorDTO ociHelmConnectorDTO) {
+    if (ociHelmConnectorDTO.getAuth().getAuthType() == OciHelmAuthType.ANONYMOUS) {
+      return null;
+    }
+
+    OciHelmUsernamePasswordDTO creds = (OciHelmUsernamePasswordDTO) ociHelmConnectorDTO.getAuth().getCredentials();
     return creds.getPasswordRef().getDecryptedValue();
   }
 
@@ -1075,6 +1169,10 @@ public class HelmTaskHelperBase {
         HttpHelmStoreDelegateConfig helmStoreConfig = (HttpHelmStoreDelegateConfig) storeDelegateConfig;
         repoName = helmStoreConfig.getRepoName();
         break;
+      case OCI_HELM:
+        OciHelmStoreDelegateConfig ociHelmStoreConfig = (OciHelmStoreDelegateConfig) storeDelegateConfig;
+        repoName = ociHelmStoreConfig.getRepoName();
+        break;
       case S3_HELM:
         S3HelmStoreDelegateConfig s3StoreConfig = (S3HelmStoreDelegateConfig) storeDelegateConfig;
         repoName = s3StoreConfig.getRepoName();
@@ -1120,6 +1218,13 @@ public class HelmTaskHelperBase {
         for (DecryptableEntity entity : httpHelmStoreConfig.getHttpHelmConnector().getDecryptableEntities()) {
           decryptionService.decrypt(entity, httpHelmStoreConfig.getEncryptedDataDetails());
           ExceptionMessageSanitizer.storeAllSecretsForSanitizing(entity, httpHelmStoreConfig.getEncryptedDataDetails());
+        }
+        break;
+      case OCI_HELM:
+        OciHelmStoreDelegateConfig ociHelmStoreConfig = (OciHelmStoreDelegateConfig) helmStoreDelegateConfig;
+        for (DecryptableEntity entity : ociHelmStoreConfig.getOciHelmConnector().getDecryptableEntities()) {
+          decryptionService.decrypt(entity, ociHelmStoreConfig.getEncryptedDataDetails());
+          ExceptionMessageSanitizer.storeAllSecretsForSanitizing(entity, ociHelmStoreConfig.getEncryptedDataDetails());
         }
         break;
       default:

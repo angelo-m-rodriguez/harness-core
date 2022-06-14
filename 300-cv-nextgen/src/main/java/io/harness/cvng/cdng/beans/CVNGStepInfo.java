@@ -53,7 +53,11 @@ public class CVNGStepInfo implements CVStepInfoBase {
   private String uuid;
 
   @NotNull String type;
-  @JsonTypeInfo(use = NAME, property = "type", include = EXTERNAL_PROPERTY, visible = true) VerificationJobSpec spec;
+  @NotNull
+  @JsonTypeInfo(use = NAME, property = "type", include = EXTERNAL_PROPERTY, visible = true)
+  VerificationJobSpec spec;
+
+  MonitoredServiceNode monitoredService;
 
   @Builder
   @ConstructorProperties({"type", "spec"})
@@ -89,6 +93,7 @@ public class CVNGStepInfo implements CVStepInfoBase {
         .sensitivity(spec.getSensitivity())
         .verificationJobBuilder(spec.getVerificationJobBuilder())
         .spec(spec)
+        .monitoredService(monitoredService)
         .build();
   }
 }

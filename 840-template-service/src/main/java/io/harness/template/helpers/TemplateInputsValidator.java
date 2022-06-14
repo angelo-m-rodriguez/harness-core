@@ -61,7 +61,7 @@ public class TemplateInputsValidator {
     return validateTemplateInputsResponse;
   }
 
-  public ValidateTemplateInputsResponseDTO validateNestedTemplateInputsForPipeline(
+  public ValidateTemplateInputsResponseDTO validateNestedTemplateInputsForGivenYaml(
       String accountId, String orgId, String projectId, String yaml) {
     ErrorNodeSummary errorNodeSummary = ErrorNodeSummary.builder().childrenErrorNodes(new ArrayList<>()).build();
 
@@ -136,7 +136,7 @@ public class TemplateInputsValidator {
       if (arrayElement.isArray()) {
         // Value -> Array
         validateNestedTemplateInputsInArray(
-            accountId, orgId, projectId, yamlNode, templateCacheMap, depth, validateTemplateInputsResponse);
+            accountId, orgId, projectId, arrayElement, templateCacheMap, depth, validateTemplateInputsResponse);
       } else if (arrayElement.isObject()) {
         // Value -> Object
         validateNestedTemplateInputsInObject(

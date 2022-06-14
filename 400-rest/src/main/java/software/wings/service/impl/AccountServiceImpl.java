@@ -506,6 +506,7 @@ public class AccountServiceImpl implements AccountService {
     } else if (account.isCreatedFromNG()) {
       updateNextGenEnabled(account.getUuid(), true);
     }
+    featureFlagService.enableAccount(FeatureName.USE_IMMUTABLE_DELEGATE, account.getUuid());
   }
 
   List<Role> createDefaultRoles(Account account) {
@@ -996,6 +997,10 @@ public class AccountServiceImpl implements AccountService {
                           .get();
 
     if (account.getDelegateConfiguration() != null) {
+      if (account.getDelegateConfiguration().isValidTillNextRelease()) {
+        return account.getDelegateConfiguration();
+      }
+
       if (account.getDelegateConfiguration().getValidUntil() == null) {
         log.warn("The delegate configuration for account [{}] doesn't have valid until field.", accountId);
       }
@@ -1015,6 +1020,11 @@ public class AccountServiceImpl implements AccountService {
                   .project("delegateConfiguration", true)
                   .get();
     return account.getDelegateConfiguration();
+  }
+
+  @Override
+  public List<String> getWatcherVersion(String accountId) {
+    return delegateVersionService.getWatcherJarVersions(accountId);
   }
 
   @Override
@@ -1992,7 +2002,7 @@ public class AccountServiceImpl implements AccountService {
 
   @Override
   public AuthenticationInfo getAuthenticationInfo(String accountId) {
-    Account account = getFromCacheWithFallback(accountId);
+    Account account = get(accountId);
     if (account == null) {
       throw new InvalidRequestException("Account not found");
     }
