@@ -1275,6 +1275,8 @@ public class DelegateModule extends AbstractModule {
         MapBinder.newMapBinder(binder(), String.class, AzureWebAppRequestHandler.class);
     azureWebAppRequestTypeToRequestHandlerMap.addBinding(AzureWebAppRequestType.SLOT_DEPLOYMENT.name())
         .to(AzureWebAppSlotDeploymentRequestHandler.class);
+      azureWebAppRequestTypeToRequestHandlerMap.addBinding(AzureWebAppRequestType.ROLLBACK.name())
+              .to(io.harness.delegate.task.azure.appservice.webapp.handler.AzureWebAppRollbackTaskHandler.class);
 
     // Ssh and WinRM task handlers
     MapBinder<String, CommandHandler> commandUnitHandlers =
