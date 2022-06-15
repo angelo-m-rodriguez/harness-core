@@ -628,7 +628,7 @@ public class LicenseServiceImpl implements LicenseService {
   private void checkAtLeastOneModuleLicenseActive(
       Account account, LicenseInfo licenseInfo, CheckExpiryResultDTO ngLicenseDecision) {
     CeLicenseInfo ceLicenseInfo = account.getCeLicenseInfo();
-    if (!ngLicenseDecision.isShouldDelete()
+    if (ngLicenseDecision.isNgAccountActive()
         || (licenseInfo != null && licenseInfo.getAccountStatus().equals(AccountStatus.ACTIVE))
         || (ceLicenseInfo != null && ceLicenseInfo.getExpiryTime() > System.currentTimeMillis())) {
       account.setAtLeastOneModuleLicenseActive(true);
