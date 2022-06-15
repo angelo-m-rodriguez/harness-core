@@ -376,7 +376,7 @@ public enum FeatureName {
   TI_DOTNET,
   CVNG_SPLUNK_METRICS,
   AUTO_FREE_MODULE_LICENSE,
-  ACCOUNT_BASIC_ROLE_ONLY;
+  AZURE_WEBAPP_NG;
 
   FeatureName() {
     scope = Scope.PER_ACCOUNT;
