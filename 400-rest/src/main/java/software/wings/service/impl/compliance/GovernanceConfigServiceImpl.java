@@ -101,7 +101,7 @@ import org.mongodb.morphia.query.UpdateOperations;
 public class GovernanceConfigServiceImpl implements GovernanceConfigService {
   private static final long MIN_FREEZE_WINDOW_TIME = 1800000L;
   private static final long MAX_FREEZE_WINDOW_TIME = 31536000000L;
-  private static final String GOVERNANCE_CONFIG = "GOVERNANCE_CONFIG";
+  public static final String GOVERNANCE_CONFIG = "GOVERNANCE_CONFIG";
 
   @Inject private WingsPersistence wingsPersistence;
   @Inject private AccountService accountService;
@@ -242,12 +242,18 @@ public class GovernanceConfigServiceImpl implements GovernanceConfigService {
 
   private void updateUserGroupReference(
       GovernanceConfig updatedSetting, GovernanceConfig oldSetting, String accountId) {
-    List<TimeRangeBasedFreezeConfig> oldTimeRangeBasedFreezeConfigs = oldSetting.getTimeRangeBasedFreezeConfigs();
-    List<TimeRangeBasedFreezeConfig> newTimeRangeBasedFreezeConfigs = updatedSetting.getTimeRangeBasedFreezeConfigs();
-    Set<String> currentReferencedUserGroups = getReferencedUserGroupIds(oldTimeRangeBasedFreezeConfigs);
-    Set<String> updatedReferencedUserGroups = getReferencedUserGroupIds(newTimeRangeBasedFreezeConfigs);
-    updateFreezeWindowReferenceInUserGroup(currentReferencedUserGroups, updatedReferencedUserGroups, accountId,
-        oldSetting.getAppId(), oldSetting.getUuid());
+    try {
+      List<TimeRangeBasedFreezeConfig> oldTimeRangeBasedFreezeConfigs = oldSetting.getTimeRangeBasedFreezeConfigs();
+      List<TimeRangeBasedFreezeConfig> newTimeRangeBasedFreezeConfigs = updatedSetting.getTimeRangeBasedFreezeConfigs();
+      Set<String> currentReferencedUserGroups = getReferencedUserGroupIds(oldTimeRangeBasedFreezeConfigs);
+      Set<String> updatedReferencedUserGroups = getReferencedUserGroupIds(newTimeRangeBasedFreezeConfigs);
+      updateFreezeWindowReferenceInUserGroup(currentReferencedUserGroups, updatedReferencedUserGroups, accountId,
+          oldSetting.getAppId(), oldSetting.getUuid());
+    } catch (Exception e) {
+      log.error(
+          "error while fetching the timeRangeBasedFreezeConfig in account with id {} in Governance Config with id {}",
+          accountId, updatedSetting.getUuid());
+    }
   }
   @Override
   public Set<String> getReferencedUserGroupIds(List<TimeRangeBasedFreezeConfig> timeRangeBasedFreezeConfig) {
