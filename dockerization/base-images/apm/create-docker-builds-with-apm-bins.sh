@@ -63,7 +63,7 @@ export TAKIPI_AGENT='https://harness.jfrog.io/artifactory/BuildsTools/docker/apm
 export ET_AGENT='https://get.et.harness.io/releases/latest/nix/harness-et-agent.tar.gz'
 
 export REGISTRY_PATH='us.gcr.io/platform-205701'
-export REPO_PATH='harness/saas-openjdk-temurin-11'
+export REPO_PATH=${REPO_PATH}
 export APM_PATH='apm-images'
 export VERSION=${VERSION}
 
@@ -71,7 +71,7 @@ IMAGES_LIST=(manager ng-manager verification-service batch-processing event-serv
 template-service ci-manager command-library-server change-data-capture platform-service eventsapi-monitor dms ng-dashboard-aggregator)
 
 #<+steps.build.output.outputVariables.VERSION>
-if [ -z "${VERSION}" ]; then
+if [ -z "${VERSION}" ] && [ -z "${REPO_PATH}" ]; then
     echo "ERROR: VERSION is not defined. Exiting..."
     exit 1
 fi
