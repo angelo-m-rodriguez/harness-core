@@ -1143,15 +1143,34 @@ public class MonitoredServiceServiceImpl implements MonitoredServiceService {
       ProjectParams projectParams, String identifier, boolean enable) {
     MonitoredService monitoredService = getMonitoredService(projectParams, identifier);
     Preconditions.checkNotNull(monitoredService, "Monitored service with identifier %s does not exists", identifier);
+
+    MonitoredServiceParams monitoredServiceParams = MonitoredServiceParams.builder()
+                                                        .accountIdentifier(projectParams.getAccountIdentifier())
+                                                        .orgIdentifier(projectParams.getOrgIdentifier())
+                                                        .projectIdentifier(projectParams.getProjectIdentifier())
+                                                        .monitoredServiceIdentifier(identifier)
+                                                        .build();
+    MonitoredServiceDTO monitoredServiceDTO = getMonitoredServiceDTO(monitoredServiceParams);
+    monitoredServiceDTO.setEnabled(monitoredService.isEnabled());
+    MonitoredServiceYamlDTO oldMonitoredServiceYamlDTO =
+        MonitoredServiceYamlDTO.builder().monitoredServiceDTO(monitoredServiceDTO).build();
+    monitoredServiceDTO.setEnabled(monitoredService.isEnabled());
+    MonitoredServiceYamlDTO newMOnitoredServiceYamlDTO =
+        MonitoredServiceYamlDTO.builder().monitoredServiceDTO(monitoredServiceDTO).build();
+
     healthSourceService.setHealthMonitoringFlag(projectParams.getAccountIdentifier(), projectParams.getOrgIdentifier(),
         projectParams.getProjectIdentifier(), monitoredService.getIdentifier(),
         monitoredService.getHealthSourceIdentifiers(), enable);
+
     hPersistence.update(
         hPersistence.createQuery(MonitoredService.class).filter(MonitoredServiceKeys.uuid, monitoredService.getUuid()),
         hPersistence.createUpdateOperations(MonitoredService.class).set(MonitoredServiceKeys.enabled, enable));
+
     outboxService.save(MonitoredServiceToggleEvent.builder()
                            .resourceName(monitoredService.getName())
                            .accountIdentifier(monitoredService.getAccountId())
+                           .oldMonitoredServiceYamlDTO(oldMonitoredServiceYamlDTO)
+                           .newMonitoredServiceYamlDTO(newMOnitoredServiceYamlDTO)
                            .monitoredServiceIdentifier(monitoredService.getIdentifier())
                            .orgIdentifier(monitoredService.getOrgIdentifier())
                            .projectIdentifier(monitoredService.getProjectIdentifier())
