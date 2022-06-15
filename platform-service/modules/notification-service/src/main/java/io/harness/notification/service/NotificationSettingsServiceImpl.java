@@ -157,17 +157,15 @@ public class NotificationSettingsServiceImpl implements NotificationSettingsServ
     } else {
       if (!notificationSetting.isEmpty()) {
         if (notificationSetting.get(0).startsWith(EXPR_START) && notificationSetting.get(0).endsWith(EXPR_END)) {
-          log.info("Resolving UserGroup expression: {}" , notificationSetting.get(0));
           if (!VALID_EXPRESSION_PATTERN.matcher(notificationSetting.get(0)).matches()) {
             throw new InvalidRequestException("Expression provided is not valid");
           }
-          log.info("Resolving UserGroup expression");
+          log.info("Resolving UserGroup secrets expression");
           SecretExpressionEvaluator evaluator = new SecretExpressionEvaluator(expressionFunctorToken);
           Object resolvedExpressions = evaluator.resolve(notificationSetting, true);
           if (resolvedExpressions == null) {
             throw new InvalidRequestException("Expression provided is not valid");
           }
-          log.info("Parsed Expression {}", resolvedExpressions);
           return (List<String>) resolvedExpressions;
         } else {
           return notificationSetting;

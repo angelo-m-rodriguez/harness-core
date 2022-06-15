@@ -144,14 +144,6 @@ public class SlackServiceImpl implements ChannelService {
                                                     .build();
       String taskId = delegateGrpcClientWrapper.submitAsyncTask(delegateTaskRequest, Duration.ZERO);
       log.info("Async delegate task created with taskID {}", taskId);
-      log.info("((SlackTaskParams) delegateTaskRequest.getTaskParameters()).getSlackWebhookUrls().get(0) {}", ((SlackTaskParams) delegateTaskRequest.getTaskParameters()).getSlackWebhookUrls().get(0));
-//      log.info("((SlackTaskParams) delegateTaskRequest.getTaskParameters()).getMessage {}", ((SlackTaskParams) delegateTaskRequest.getTaskParameters()).getMessage());
-//      log.info("((SlackTaskParams) delegateTaskRequest.getTaskParameters()).getNotificationId {}", ((SlackTaskParams) delegateTaskRequest.getTaskParameters()).getNotificationId());
-//      log.info("Async delegate task created with delegateTaskRequest ACCOUNT_IDENTIFIER {}", delegateTaskRequest.getTaskSetupAbstractions().get(ACCOUNT_IDENTIFIER));
-//      log.info("Async delegate task created with delegateTaskRequest PROJECT_IDENTIFIER {}", delegateTaskRequest.getTaskSetupAbstractions().get(PROJECT_IDENTIFIER));
-//      log.info("Async delegate task created with delegateTaskRequest ORG_IDENTIFIER {}", delegateTaskRequest.getTaskSetupAbstractions().get(ORG_IDENTIFIER));
-//      log.info("Async delegate task created with delegateTaskRequest expressionFunctorToken {}", delegateTaskRequest.getExpressionFunctorToken());
-//      log.info("Async delegate task created with delegateTaskRequest account id {}", delegateTaskRequest.getAccountId());
       processingResponse = NotificationProcessingResponse.allSent(slackWebhookUrls.size());
     } else {
       processingResponse = slackSender.send(slackWebhookUrls, message, notificationId);
