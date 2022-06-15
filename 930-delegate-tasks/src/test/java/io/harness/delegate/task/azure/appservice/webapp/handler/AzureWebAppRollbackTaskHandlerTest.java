@@ -14,6 +14,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import io.harness.annotations.dev.OwnedBy;
@@ -124,6 +125,34 @@ public class AzureWebAppRollbackTaskHandlerTest {
     doNothing()
         .when(azureAppServiceDeploymentService)
         .rerouteProductionSlotTraffic(any(), eq(DEPLOYMENT_SLOT), eq(TRAFFIC_WEIGHT), any());
+  }
+
+  @Test
+  @Owner(developers = VLICA)
+  @Category(UnitTests.class)
+  public void testRollbackWithProgressMaker() {
+    mockRerouteProductionSlotTraffic();
+    final AzureWebAppRollbackRequest request =
+        AzureWebAppRollbackRequest.builder()
+            .preDeploymentData(AzureTestUtils.buildTestPreDeploymentData(AppServiceDeploymentProgress.STOP_SLOT))
+            .infrastructure(AzureTestUtils.createTestWebAppInfraDelegateConfig())
+            .artifact(AzureTestUtils.createTestContainerArtifactConfig())
+            .timeoutIntervalInMin(10)
+            .build();
+
+    AzureWebAppRequestResponse requestResponse =
+        requestHandler.execute(request, AzureTestUtils.createTestAzureConfig(), logCallbackProvider);
+    assertThat(requestResponse).isNotNull();
+    verify(azureAppServiceDeploymentService).startSlotAsyncWithSteadyCheck(any(), any(), any());
+    verify(azureAppServiceService, never()).fetchDeploymentData(any(), eq(DEPLOYMENT_SLOT));
+    verify(azureAppServiceDeploymentService, never()).deployDockerImage(any(), any());
+
+    request.getPreDeploymentData().setDeploymentProgressMarker(AppServiceDeploymentProgress.DEPLOYMENT_COMPLETE.name());
+    AzureWebAppRequestResponse requestRespons2 =
+        requestHandler.execute(request, AzureTestUtils.createTestAzureConfig(), logCallbackProvider);
+    assertThat(requestRespons2).isNotNull();
+    verify(azureAppServiceDeploymentService, never()).deployDockerImage(any(), any());
+    verify(azureAppServiceDeploymentService, never()).stopSlotAsyncWithSteadyCheck(any(), any(), any());
   }
 
   @Test
