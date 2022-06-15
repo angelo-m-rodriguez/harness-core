@@ -1,7 +1,7 @@
 package io.harness.notification.evaluator;
 
-import io.harness.engine.expressions.functors.SecretFunctor;
 import io.harness.expression.EngineExpressionEvaluator;
+import io.harness.notification.functor.SecretFunctor;
 
 public class SecretExpressionEvaluator extends EngineExpressionEvaluator {
   private final long expressionFunctorToken;
