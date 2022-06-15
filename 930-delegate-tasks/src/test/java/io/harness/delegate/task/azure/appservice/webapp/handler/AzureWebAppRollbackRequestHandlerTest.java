@@ -47,7 +47,7 @@ import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
 @OwnedBy(CDP)
-public class AzureWebAppRollbackTaskHandlerTest {
+public class AzureWebAppRollbackRequestHandlerTest {
   @Rule public MockitoRule mockitoRule = MockitoJUnit.rule();
   @Mock private AzureAppServiceDeploymentService azureAppServiceDeploymentService;
   @Mock private AzureAppServiceService azureAppServiceService;
@@ -55,7 +55,8 @@ public class AzureWebAppRollbackTaskHandlerTest {
   @Mock private AzureLogCallbackProvider logCallbackProvider;
   @Mock private LogCallback mockLogCallback;
 
-  @InjectMocks AzureWebAppRollbackTaskHandler requestHandler;
+  @InjectMocks
+  AzureWebAppRollbackRequestHandler requestHandler;
 
   @Before
   public void setup() {

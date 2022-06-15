@@ -165,6 +165,7 @@ import io.harness.delegate.task.azure.AzureValidationHandler;
 import io.harness.delegate.task.azure.appservice.AzureAppServiceTaskParameters.AzureAppServiceTaskType;
 import io.harness.delegate.task.azure.appservice.webapp.AzureWebAppTaskNG;
 import io.harness.delegate.task.azure.appservice.webapp.handler.AzureWebAppRequestHandler;
+import io.harness.delegate.task.azure.appservice.webapp.handler.AzureWebAppRollbackRequestHandler;
 import io.harness.delegate.task.azure.appservice.webapp.handler.AzureWebAppSlotDeploymentRequestHandler;
 import io.harness.delegate.task.azure.appservice.webapp.ng.AzureWebAppRequestType;
 import io.harness.delegate.task.azure.arm.AzureARMTaskParameters;
@@ -1276,7 +1277,7 @@ public class DelegateModule extends AbstractModule {
     azureWebAppRequestTypeToRequestHandlerMap.addBinding(AzureWebAppRequestType.SLOT_DEPLOYMENT.name())
         .to(AzureWebAppSlotDeploymentRequestHandler.class);
       azureWebAppRequestTypeToRequestHandlerMap.addBinding(AzureWebAppRequestType.ROLLBACK.name())
-              .to(io.harness.delegate.task.azure.appservice.webapp.handler.AzureWebAppRollbackTaskHandler.class);
+              .to(AzureWebAppRollbackRequestHandler.class);
 
     // Ssh and WinRM task handlers
     MapBinder<String, CommandHandler> commandUnitHandlers =

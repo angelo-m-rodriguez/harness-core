@@ -45,7 +45,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @OwnedBy(CDP)
 @Slf4j
-public class AzureWebAppRollbackTaskHandler extends AzureWebAppRequestHandler<AzureWebAppRollbackRequest> {
+public class AzureWebAppRollbackRequestHandler extends AzureWebAppRequestHandler<AzureWebAppRollbackRequest> {
   @Inject private AzureAppServiceResourceUtilities azureAppServiceResourceUtilities;
 
   @Override
@@ -252,8 +252,8 @@ public class AzureWebAppRollbackTaskHandler extends AzureWebAppRequestHandler<Az
   }
 
   private void markCommandUnitAsDone(
-      AzureLogCallbackProvider logStreamingTaskClient, String commandUnit, String message) {
-    LogCallback logCallback = logStreamingTaskClient.obtainLogCallback(commandUnit);
+      AzureLogCallbackProvider logCallbackProvider, String commandUnit, String message) {
+    LogCallback logCallback = logCallbackProvider.obtainLogCallback(commandUnit);
     logCallback.saveExecutionLog(
         String.format("Message - [%s]", message), LogLevel.INFO, CommandExecutionStatus.SUCCESS);
   }

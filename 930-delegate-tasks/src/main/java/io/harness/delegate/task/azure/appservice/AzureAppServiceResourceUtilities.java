@@ -33,6 +33,7 @@ import lombok.extern.slf4j.Slf4j;
 @Singleton
 public class AzureAppServiceResourceUtilities {
   @Inject private AzureContainerRegistryService azureContainerRegistryService;
+  private static final int defaultTimeoutInterval = 10;
 
   public Map<String, AzureAppServiceApplicationSetting> getAppSettingsToAdd(
       List<AzureAppServiceApplicationSetting> applicationSettings) {
@@ -61,7 +62,6 @@ public class AzureAppServiceResourceUtilities {
   }
 
   public int getTimeoutIntervalInMin(Integer timeoutIntervalInMin) {
-    int defaultTimeoutInterval = 10;
     if (timeoutIntervalInMin != null) {
       return timeoutIntervalInMin;
     } else {
