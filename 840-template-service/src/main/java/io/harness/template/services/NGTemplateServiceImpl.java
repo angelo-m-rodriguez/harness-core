@@ -56,6 +56,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -345,11 +346,11 @@ public class NGTemplateServiceImpl implements NGTemplateService {
   }
 
   private String getMessageHelper(String accountId, String orgIdentifier, String projectIdentifier) {
-    if (projectIdentifier != null && !projectIdentifier.isEmpty()) {
+    if (StringUtils.isNotEmpty(projectIdentifier)) {
       return format("under Project[%s], Organization [%s], Account [%s]", projectIdentifier, orgIdentifier, accountId);
-    } else if (orgIdentifier != null && !orgIdentifier.isEmpty()) {
+    } else if (StringUtils.isNotEmpty(orgIdentifier)) {
       return format("under Organization [%s], Account [%s]", orgIdentifier, accountId);
-    } else if (accountId != null && !accountId.isEmpty()) {
+    } else if (StringUtils.isNotEmpty(accountId)) {
       return format("under Account [%s]", accountId);
     } else {
       return "";
