@@ -58,6 +58,7 @@ public class NotificationSettingsServiceImpl implements NotificationSettingsServ
   private final SmtpConfigClient smtpConfigClient;
   private static final Pattern VALID_EXPRESSION_PATTERN =
       Pattern.compile("\\<\\+secrets.getValue\\((\\\"|\\')\\w*(\\\"|\\')\\)>");
+  private static final String INVALID_EXPRESSION_EXCEPTION = "Expression provided is not valid";
 
   private List<UserGroupDTO> getUserGroups(List<String> userGroupIds) {
     if (isEmpty(userGroupIds)) {
@@ -152,28 +153,23 @@ public class NotificationSettingsServiceImpl implements NotificationSettingsServ
   @VisibleForTesting
   List<String> resolveUserGroups(
       NotificationChannelType notificationChannelType, List<String> notificationSetting, long expressionFunctorToken) {
-    if (notificationChannelType.equals(NotificationChannelType.EMAIL)) {
-      return notificationSetting;
-    } else {
+    if (!notificationChannelType.equals(NotificationChannelType.EMAIL)) {
       if (!notificationSetting.isEmpty()) {
         if (notificationSetting.get(0).startsWith(EXPR_START) && notificationSetting.get(0).endsWith(EXPR_END)) {
           if (!VALID_EXPRESSION_PATTERN.matcher(notificationSetting.get(0)).matches()) {
-            throw new InvalidRequestException("Expression provided is not valid");
+            throw new InvalidRequestException(INVALID_EXPRESSION_EXCEPTION);
           }
           log.info("Resolving UserGroup secrets expression");
           SecretExpressionEvaluator evaluator = new SecretExpressionEvaluator(expressionFunctorToken);
           Object resolvedExpressions = evaluator.resolve(notificationSetting, true);
           if (resolvedExpressions == null) {
-            throw new InvalidRequestException("Expression provided is not valid");
+            throw new InvalidRequestException(INVALID_EXPRESSION_EXCEPTION);
           }
           return (List<String>) resolvedExpressions;
-        } else {
-          return notificationSetting;
         }
-      } else {
-        return notificationSetting;
       }
     }
+    return notificationSetting;
   }
 
   @Override

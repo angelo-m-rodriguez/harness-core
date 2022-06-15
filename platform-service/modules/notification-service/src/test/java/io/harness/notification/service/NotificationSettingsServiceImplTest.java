@@ -34,15 +34,17 @@ public class NotificationSettingsServiceImplTest extends CategoryTest {
   @Mock private NotificationSettingRepository notificationSettingRepository;
   @Mock private SmtpConfigClient smtpConfigClient;
   private NotificationSettingsServiceImpl notificationSettingsService;
-  private String slackWebhookurl = "https://hooks.slack.com/services/TL81600E8/B027JT97D5X/";
-  private String slackSecret1 = "<+secrets.getValue('SlackWebhookUrlSecret1')>";
-  private String slackSecret2 = "<+secrets.getValue('SlackWebhookUrlSecret2')>";
-  private String slackSecret3 = "<+secrets.getValue(\"SlackWebhookUrlSecret3\")>";
-  private String pagerDutySecret = "<+secrets.getValue('PagerDutyWebhookUrlSecret')>";
+  private final static String SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/TL81600E8/B027JT97D5X/";
+  private final static String SLACK_SECRET_1 = "<+secrets.getValue('SlackWebhookUrlSecret1')>";
+  private final static String SLACK_SECRET_2 = "<+secrets.getValue('SlackWebhookUrlSecret2')>";
+  private final static String SLACK_SECRET_3 = "<+secrets.getValue(\"SlackWebhookUrlSecret3\")>";
+  private final static String PAGERDUTY_SECRET = "<+secrets.getValue('PagerDutyWebhookUrlSecret')>";
+  private long expressionFunctorToken;
 
   @Before
   public void setUp() {
     MockitoAnnotations.initMocks(this);
+    expressionFunctorToken = HashGenerator.generateIntegerHash();
     notificationSettingsService = new NotificationSettingsServiceImpl(
         userGroupClient, userClient, notificationSettingRepository, smtpConfigClient);
   }
@@ -52,9 +54,8 @@ public class NotificationSettingsServiceImplTest extends CategoryTest {
   @Category(UnitTests.class)
   public void testGetNotificationRequestForSecretExpressionSlackUserGroups() {
     List<String> notificationSettings = new ArrayList<>();
-    notificationSettings.add(slackSecret1);
-    notificationSettings.add(slackSecret2);
-    long expressionFunctorToken = HashGenerator.generateIntegerHash();
+    notificationSettings.add(SLACK_SECRET_1);
+    notificationSettings.add(SLACK_SECRET_2);
     List<String> resolvedUserGroups = notificationSettingsService.resolveUserGroups(
         NotificationChannelType.SLACK, notificationSettings, expressionFunctorToken);
     String expectedUserGroup1 =
@@ -71,7 +72,6 @@ public class NotificationSettingsServiceImplTest extends CategoryTest {
   public void testGetNotificationRequestForInvalidExpression() {
     List<String> notificationSettings = new ArrayList<>();
     notificationSettings.add("<+adbc>");
-    long expressionFunctorToken = HashGenerator.generateIntegerHash();
     assertThatThrownBy(()
                            -> notificationSettingsService.resolveUserGroups(
                                NotificationChannelType.SLACK, notificationSettings, expressionFunctorToken))
@@ -84,11 +84,10 @@ public class NotificationSettingsServiceImplTest extends CategoryTest {
   @Category(UnitTests.class)
   public void testGetNotificationRequestForPlainTextSlackUserGroups() {
     List<String> notificationSettings = new ArrayList<>();
-    notificationSettings.add(slackWebhookurl);
-    long expressionFunctorToken = HashGenerator.generateIntegerHash();
+    notificationSettings.add(SLACK_WEBHOOK_URL);
     List<String> resolvedUserGroups = notificationSettingsService.resolveUserGroups(
         NotificationChannelType.SLACK, notificationSettings, expressionFunctorToken);
-    assertEquals(slackWebhookurl, resolvedUserGroups.get(0));
+    assertEquals(SLACK_WEBHOOK_URL, resolvedUserGroups.get(0));
   }
 
   @Test
@@ -96,8 +95,7 @@ public class NotificationSettingsServiceImplTest extends CategoryTest {
   @Category(UnitTests.class)
   public void testGetNotificationRequestForSecretExpressionPagerDutyUserGroups() {
     List<String> notificationSettings = new ArrayList<>();
-    notificationSettings.add(pagerDutySecret);
-    long expressionFunctorToken = HashGenerator.generateIntegerHash();
+    notificationSettings.add(PAGERDUTY_SECRET);
     List<String> resolvedUserGroups = notificationSettingsService.resolveUserGroups(
         NotificationChannelType.SLACK, notificationSettings, expressionFunctorToken);
     String expectedUserGroup =
@@ -109,7 +107,6 @@ public class NotificationSettingsServiceImplTest extends CategoryTest {
   @Owner(developers = ADITHYA)
   @Category(UnitTests.class)
   public void testGetNotificationRequestForEmptyUserGroups() {
-    long expressionFunctorToken = HashGenerator.generateIntegerHash();
     List<String> resolvedUserGroups = notificationSettingsService.resolveUserGroups(
         NotificationChannelType.SLACK, new ArrayList<>(), expressionFunctorToken);
     assertTrue(resolvedUserGroups.isEmpty());
@@ -120,8 +117,7 @@ public class NotificationSettingsServiceImplTest extends CategoryTest {
   @Category(UnitTests.class)
   public void testRegex() {
     List<String> notificationSettings = new ArrayList<>();
-    notificationSettings.add(slackSecret3);
-    long expressionFunctorToken = HashGenerator.generateIntegerHash();
+    notificationSettings.add(SLACK_SECRET_3);
     List<String> resolvedUserGroups = notificationSettingsService.resolveUserGroups(
         NotificationChannelType.SLACK, notificationSettings, expressionFunctorToken);
     String expectedUserGroup1 =
