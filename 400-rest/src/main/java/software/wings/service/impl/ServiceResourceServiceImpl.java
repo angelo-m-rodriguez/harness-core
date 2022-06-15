@@ -3363,6 +3363,13 @@ public class ServiceResourceServiceImpl implements ServiceResourceService, DataP
             );
           }
           break;
+        case AZURE_VMSS:
+          if (service.getArtifactType() != ArtifactType.AZURE_MACHINE_IMAGE) {
+            throw new InvalidRequestException(
+                    "Only Azure machine image ArtifactType allowed for Azure Virtual Machine Scale Set Deployment Type"
+            );
+          }
+          break;
         default:
           break;
       }
