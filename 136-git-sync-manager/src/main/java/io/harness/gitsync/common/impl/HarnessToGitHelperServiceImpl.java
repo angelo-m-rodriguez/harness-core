@@ -550,7 +550,7 @@ public class HarnessToGitHelperServiceImpl implements HarnessToGitHelperService 
                 .setBlobId(scmGetFileResponseDTO.getBlobId())
                 .setFilePath(getFileRequest.getFilePath())
                 .setFileUrl(gitFilePathHelper.getFileUrl(scope, getFileRequest.getConnectorRef(),
-                    getFileRequest.getRepoName(), getFileRequest.getBranchName(), getFileRequest.getFilePath()))
+                    getFileRequest.getRepoName(), scmGetFileResponseDTO.getBranchName(), getFileRequest.getFilePath()))
                 .build())
         .build();
   }
