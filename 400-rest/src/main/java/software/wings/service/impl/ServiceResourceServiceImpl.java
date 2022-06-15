@@ -31,7 +31,19 @@ import static io.harness.persistence.HQuery.excludeAuthority;
 import static io.harness.validation.PersistenceValidator.duplicateCheck;
 import static io.harness.validation.Validator.notNullCheck;
 
-import static software.wings.api.DeploymentType.*;
+import static software.wings.api.DeploymentType.AWS_CODEDEPLOY;
+import static software.wings.api.DeploymentType.SSH;
+import static software.wings.api.DeploymentType.CUSTOM;
+import static software.wings.api.DeploymentType.PCF;
+import static software.wings.api.DeploymentType.KUBERNETES;
+import static software.wings.api.DeploymentType.AMI;
+import static software.wings.api.DeploymentType.AWS_LAMBDA;
+import static software.wings.api.DeploymentType.ECS;
+import static software.wings.api.DeploymentType.HELM;
+import static software.wings.api.DeploymentType.AZURE_WEBAPP;
+import static software.wings.api.DeploymentType.valueOf;
+
+
 import static software.wings.beans.ConfigFile.DEFAULT_TEMPLATE_ID;
 import static software.wings.beans.EntityVersion.Builder.anEntityVersion;
 import static software.wings.beans.Service.GLOBAL_SERVICE_NAME_FOR_YAML;
@@ -3300,58 +3312,60 @@ public class ServiceResourceServiceImpl implements ServiceResourceService, DataP
   }
 
   private void checkArtifactType (Service service) {
-    switch (service.getDeploymentType()) {
-      case KUBERNETES:
-        if(service.getArtifactType() != ArtifactType.DOCKER) {
-          throw new InvalidRequestException(
-                  "Only Docker ArtifactType allowed for KUBERNETES Deployment Type"
-          );
-        }
-        break;
-      case HELM:
-        if( service.getArtifactType() != ArtifactType.DOCKER){
-          throw new InvalidRequestException(
-                  "Only Docker ArtifactType allowed for HELM Deployment Type"
-          );
-        }
-        break;
-      case ECS:
-        if( service.getArtifactType() != ArtifactType.DOCKER) {
-          throw new InvalidRequestException(
-                  "Only DOCKER ArtifactType allowed for Amazon EC2 Container Services (ECS) Deployment Type"
-          );
-        }
-        break;
-      case AWS_CODEDEPLOY:
-        if( service.getArtifactType() != ArtifactType.AWS_CODEDEPLOY){
-          throw new InvalidRequestException(
-                  "Only AWS CODEDEPLOY ArtifactType allowed for AWS CODEDEPLOY Deployment Type"
-          );
-        }
-        break;
-      case AWS_LAMBDA:
-        if(service.getArtifactType() != ArtifactType.AWS_LAMBDA){
-          throw new InvalidRequestException(
-                  "Only AWS Lambda ArtifactType allowed for AWS Lambda Deployment Type"
-          );
-        }
-        break;
-      case AMI:
-        if(service.getArtifactType() != ArtifactType.AMI){
-          throw new InvalidRequestException(
-                  "Only AMI ArtifactType allowed for AMI Deployment Type"
-          );
-        }
-        break;
-      case PCF:
-        if(service.getArtifactType() != ArtifactType.PCF){
-          throw new InvalidRequestException(
-                  "Only PCF ArtifactType allowed for Tanzu Application Services Deployment Type"
-          );
-        }
-        break;
-      default:
-        break;
+    if(service.getDeploymentType()!=null && service.getArtifactType()!=null) {
+      switch (service.getDeploymentType()) {
+        case KUBERNETES:
+          if (service.getArtifactType() != ArtifactType.DOCKER) {
+            throw new InvalidRequestException(
+                    "Only Docker ArtifactType allowed for KUBERNETES Deployment Type"
+            );
+          }
+          break;
+        case HELM:
+          if (service.getArtifactType() != ArtifactType.DOCKER) {
+            throw new InvalidRequestException(
+                    "Only Docker ArtifactType allowed for HELM Deployment Type"
+            );
+          }
+          break;
+        case ECS:
+          if (service.getArtifactType() != ArtifactType.DOCKER) {
+            throw new InvalidRequestException(
+                    "Only DOCKER ArtifactType allowed for Amazon EC2 Container Services (ECS) Deployment Type"
+            );
+          }
+          break;
+        case AWS_CODEDEPLOY:
+          if (service.getArtifactType() != ArtifactType.AWS_CODEDEPLOY) {
+            throw new InvalidRequestException(
+                    "Only AWS CODEDEPLOY ArtifactType allowed for AWS CODEDEPLOY Deployment Type"
+            );
+          }
+          break;
+        case AWS_LAMBDA:
+          if (service.getArtifactType() != ArtifactType.AWS_LAMBDA) {
+            throw new InvalidRequestException(
+                    "Only AWS Lambda ArtifactType allowed for AWS Lambda Deployment Type"
+            );
+          }
+          break;
+        case AMI:
+          if (service.getArtifactType() != ArtifactType.AMI) {
+            throw new InvalidRequestException(
+                    "Only AMI ArtifactType allowed for AMI Deployment Type"
+            );
+          }
+          break;
+        case PCF:
+          if (service.getArtifactType() != ArtifactType.PCF) {
+            throw new InvalidRequestException(
+                    "Only PCF ArtifactType allowed for Tanzu Application Services Deployment Type"
+            );
+          }
+          break;
+        default:
+          break;
+      }
     }
   }
 }
