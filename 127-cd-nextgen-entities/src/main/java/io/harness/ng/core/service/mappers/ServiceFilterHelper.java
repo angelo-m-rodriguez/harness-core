@@ -9,7 +9,6 @@ package io.harness.ng.core.service.mappers;
 
 import static io.harness.annotations.dev.HarnessTeam.PIPELINE;
 import static io.harness.data.structure.EmptyPredicate.isNotEmpty;
-
 import static java.lang.System.currentTimeMillis;
 import static org.springframework.data.mongodb.core.query.Criteria.where;
 
@@ -40,7 +39,9 @@ public class ServiceFilterHelper {
     }
 
     if (type != null) {
-      criteria.andOperator(where(ServiceEntityKeys.type).is(type));
+      final Criteria typeCriteria = new Criteria().orOperator(
+          where(ServiceEntityKeys.type).is(type), where(ServiceEntityKeys.type).exists(false));
+      criteria.andOperator(typeCriteria);
     }
 
     return criteria;
