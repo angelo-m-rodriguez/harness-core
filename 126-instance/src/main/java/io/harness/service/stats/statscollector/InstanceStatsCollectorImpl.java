@@ -31,9 +31,9 @@ import lombok.extern.slf4j.Slf4j;
 @Singleton
 @OwnedBy(HarnessTeam.DX)
 public class InstanceStatsCollectorImpl implements StatsCollector {
-  private static final int SYNC_INTERVAL_MINUTES = 10;
+  private static final int SYNC_INTERVAL_MINUTES = 30;
   private static final long SYNC_INTERVAL = TimeUnit.MINUTES.toMinutes(SYNC_INTERVAL_MINUTES);
-  private static final long RELAXED_SYNC_INTERVAL_IN_MILLIS = 15 * 60 * 1000L;
+  private static final long RELAXED_SYNC_INTERVAL_IN_MILLIS = 40 * 60 * 1000L;
 
   private InstanceStatsService instanceStatsService;
   private InstanceService instanceService;
