@@ -66,6 +66,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.doNothing;
@@ -1159,70 +1160,84 @@ public class ServiceResourceServiceImplTest extends WingsBaseTest {
     doNothing().when(auditServiceHelper).addEntityOperationIdentifierDataToAuditContext(any());
     doNothing().when(notificationService).sendNotificationAsync(any());
 
-    Service k8sService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(KUBERNETES).artifactType(ArtifactType.DOCKER).build();
-    Service helmService = Service.builder().name(SERVICE_NAME).accountId(ACCOUNT_ID).appId(APP_ID).deploymentType(HELM).artifactType(ArtifactType.DOCKER).build();
-    Service ecsService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(ECS).artifactType(ArtifactType.DOCKER).build();
-    Service aws_CodeDeployService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(AWS_CODEDEPLOY).artifactType(ArtifactType.AWS_CODEDEPLOY).build();
-    Service aws_LambdaService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(AWS_LAMBDA).artifactType(ArtifactType.AWS_LAMBDA).build();
-    Service amiService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(AMI).artifactType(ArtifactType.AMI).build();
-    Service pcfService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(PCF).artifactType(ArtifactType.PCF).build();
-    Service sshService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(SSH).artifactType(ArtifactType.NUGET).build();
-    Service winRMService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(WINRM).artifactType(ArtifactType.NUGET).build();
-    Service azure_VMSS_Service = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(AZURE_VMSS).artifactType(ArtifactType.AZURE_MACHINE_IMAGE).build();
-    Service customService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(CUSTOM).artifactType(ArtifactType.OTHER).build();
+    List<Service> services = new ArrayList<Service>(11);
+    services.add(generateTestData(KUBERNETES,ArtifactType.DOCKER));
+    services.add(generateTestData(HELM,ArtifactType.DOCKER));
+    services.add(generateTestData(ECS,ArtifactType.DOCKER));
+    services.add(generateTestData(AWS_CODEDEPLOY,ArtifactType.AWS_CODEDEPLOY));
+    services.add(generateTestData(AWS_LAMBDA,ArtifactType.AWS_LAMBDA));
+    services.add(generateTestData(AMI,ArtifactType.AMI));
+    services.add(generateTestData(PCF,ArtifactType.PCF));
+    services.add(generateTestData(SSH,ArtifactType.NUGET));
+    services.add(generateTestData(WINRM,ArtifactType.NUGET));
+    services.add(generateTestData(AZURE_VMSS,ArtifactType.AZURE_MACHINE_IMAGE));
+    services.add(generateTestData(CUSTOM,ArtifactType.OTHER));
 
-    serviceResourceService.save(k8sService);
-    serviceResourceService.save(helmService);
-    serviceResourceService.save(ecsService);
-    serviceResourceService.save(aws_CodeDeployService);
-    serviceResourceService.save(aws_LambdaService);
-    serviceResourceService.save(amiService);
-    serviceResourceService.save(pcfService);
-    serviceResourceService.save(sshService);
-    serviceResourceService.save(winRMService);
-    serviceResourceService.save(azure_VMSS_Service);
-    serviceResourceService.save(customService);
+    for(Service service : services){
+      assertThatCode(()->serviceResourceService.save(service)).doesNotThrowAnyException();
+    }
+  }
 
-    Service k8FailService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(KUBERNETES).artifactType(ArtifactType.NUGET).build();
-    Service helmFailService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(HELM).artifactType(ArtifactType.AMI).build();
-    Service ECSFailService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(ECS).artifactType(ArtifactType.AMI).build();
-    Service aws_CodeDeployFailService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(AWS_CODEDEPLOY).artifactType(ArtifactType.AWS_LAMBDA).build();
-    Service aws_LambdaFailService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(AWS_LAMBDA).artifactType(ArtifactType.AMI).build();
-    Service amiFailService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(AMI).artifactType(ArtifactType.DOCKER).build();
-    Service pcfFailService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(PCF).artifactType(ArtifactType.OTHER).build();
-    Service azure_VMSS_FailService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(AZURE_VMSS).artifactType(ArtifactType.OTHER).build();
+  @Test
+  @Owner(developers = TARUN_UBA)
+  @Category(UnitTests.class)
+  public void testSavingDiffArtifactFail() {
+    when(appService.getAccountIdByAppId(APP_ID)).thenReturn(ACCOUNT_ID);
+    when(featureFlagService.isEnabled(FeatureName.HARNESS_TAGS, ACCOUNT_ID)).thenReturn(true);
+    when(limitCheckerFactory.getInstance(new Action(anyString(), ActionType.CREATE_SERVICE)))
+            .thenReturn(new MockChecker(true, ActionType.CREATE_SERVICE));
+    when(applicationManifestService.create(any()))
+            .thenReturn(ApplicationManifest.builder().storeType(StoreType.Local).build());
 
-    assertThatThrownBy(() -> serviceResourceService.save(k8FailService))
+    doNothing().when(auditServiceHelper).addEntityOperationIdentifierDataToAuditContext(any());
+    doNothing().when(notificationService).sendNotificationAsync(any());
+
+    List<Service> services = new ArrayList<Service>(8);
+
+    services.add(generateTestData(KUBERNETES, ArtifactType.NUGET));
+    services.add(generateTestData(HELM, ArtifactType.AMI));
+    services.add(generateTestData(ECS, ArtifactType.AMI));
+    services.add(generateTestData(AWS_CODEDEPLOY, ArtifactType.AWS_LAMBDA));
+    services.add(generateTestData(AWS_LAMBDA, ArtifactType.AMI));
+    services.add(generateTestData(AMI, ArtifactType.DOCKER));
+    services.add(generateTestData(PCF, ArtifactType.OTHER));
+    services.add(generateTestData(AZURE_VMSS, ArtifactType.OTHER));
+
+    assertThatThrownBy(() -> serviceResourceService.save(services.get(0)))
             .isInstanceOf(InvalidRequestException.class)
             .hasMessage("Only Docker ArtifactType allowed for KUBERNETES Deployment Type");
 
-    assertThatThrownBy(() -> serviceResourceService.save(helmFailService))
+    assertThatThrownBy(() -> serviceResourceService.save(services.get(1)))
             .isInstanceOf(InvalidRequestException.class)
             .hasMessage("Only Docker ArtifactType allowed for HELM Deployment Type");
 
-    assertThatThrownBy(() -> serviceResourceService.save(ECSFailService))
+    assertThatThrownBy(() -> serviceResourceService.save(services.get(2)))
             .isInstanceOf(InvalidRequestException.class)
             .hasMessage("Only DOCKER ArtifactType allowed for Amazon EC2 Container Services (ECS) Deployment Type");
 
-    assertThatThrownBy(() -> serviceResourceService.save(aws_CodeDeployFailService))
+    assertThatThrownBy(() -> serviceResourceService.save(services.get(3)))
             .isInstanceOf(InvalidRequestException.class)
             .hasMessage("Only AWS CODEDEPLOY ArtifactType allowed for AWS CODEDEPLOY Deployment Type");
 
-    assertThatThrownBy(() -> serviceResourceService.save(aws_LambdaFailService))
+    assertThatThrownBy(() -> serviceResourceService.save(services.get(4)))
             .isInstanceOf(InvalidRequestException.class)
             .hasMessage("Only AWS Lambda ArtifactType allowed for AWS Lambda Deployment Type");
 
-    assertThatThrownBy(() -> serviceResourceService.save(amiFailService))
+    assertThatThrownBy(() -> serviceResourceService.save(services.get(5)))
             .isInstanceOf(InvalidRequestException.class)
             .hasMessage("Only AMI ArtifactType allowed for AMI Deployment Type");
 
-    assertThatThrownBy(() -> serviceResourceService.save(pcfFailService))
+    assertThatThrownBy(() -> serviceResourceService.save(services.get(6)))
             .isInstanceOf(InvalidRequestException.class)
             .hasMessage("Only PCF ArtifactType allowed for Tanzu Application Services Deployment Type");
 
-    assertThatThrownBy(() -> serviceResourceService.save(azure_VMSS_FailService))
+    assertThatThrownBy(() -> serviceResourceService.save(services.get(7)))
             .isInstanceOf(InvalidRequestException.class)
             .hasMessage("Only Azure machine image ArtifactType allowed for Azure Virtual Machine Scale Set Deployment Type");
+  }
 
+      private Service generateTestData(DeploymentType deploymentType,ArtifactType artifactType){
+        Service newService = Service.builder().appId(APP_ID).name(SERVICE_NAME).accountId(ACCOUNT_ID).deploymentType(deploymentType).artifactType(artifactType).build();
+        return newService;
       }
 }
