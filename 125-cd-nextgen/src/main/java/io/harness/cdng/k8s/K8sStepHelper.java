@@ -8,6 +8,7 @@
 package io.harness.cdng.k8s;
 
 import static io.harness.annotations.dev.HarnessTeam.CDP;
+import static io.harness.cdng.manifest.ManifestType.K8S_SUPPORTED_MANIFEST_TYPES;
 import static io.harness.common.ParameterFieldHelper.getParameterFieldValue;
 import static io.harness.data.structure.CollectionUtils.emptyIfNull;
 import static io.harness.data.structure.EmptyPredicate.isEmpty;
@@ -97,7 +98,6 @@ import io.harness.pms.expression.EngineExpressionService;
 import io.harness.pms.sdk.core.data.OptionalOutcome;
 import io.harness.pms.sdk.core.execution.SdkGraphVisualizationDataService;
 import io.harness.pms.sdk.core.resolver.RefObjectUtils;
-import io.harness.pms.sdk.core.resolver.outcome.OutcomeService;
 import io.harness.pms.sdk.core.steps.executables.TaskChainResponse;
 import io.harness.pms.sdk.core.steps.io.PassThroughData;
 import io.harness.pms.sdk.core.steps.io.StepResponse;
@@ -132,9 +132,6 @@ import org.hibernate.validator.constraints.NotEmpty;
 @OwnedBy(CDP)
 @Singleton
 public class K8sStepHelper extends CDStepHelper {
-  public static final Set<String> K8S_SUPPORTED_MANIFEST_TYPES = ImmutableSet.of(
-      ManifestType.K8Manifest, ManifestType.HelmChart, ManifestType.Kustomize, ManifestType.OpenshiftTemplate);
-
   private static final Set<String> VALUES_YAML_SUPPORTED_MANIFEST_TYPES =
       ImmutableSet.of(ManifestType.K8Manifest, ManifestType.HelmChart);
 
@@ -147,7 +144,6 @@ public class K8sStepHelper extends CDStepHelper {
   public static final Pattern releaseNamePattern = Pattern.compile(RELEASE_NAME_VALIDATION_REGEX);
   @Inject private EngineExpressionService engineExpressionService;
   @Inject private KryoSerializer kryoSerializer;
-  @Inject private OutcomeService outcomeService;
   @Inject private EncryptionHelper encryptionHelper;
   @Inject private StepHelper stepHelper;
   @Inject private SdkGraphVisualizationDataService sdkGraphVisualizationDataService;
@@ -984,16 +980,6 @@ public class K8sStepHelper extends CDStepHelper {
       default:
         return false;
     }
-  }
-
-  public InfrastructureOutcome getInfrastructureOutcome(Ambiance ambiance) {
-    OptionalOutcome optionalOutcome = outcomeService.resolveOptional(
-        ambiance, RefObjectUtils.getOutcomeRefObject(OutcomeExpressionConstants.INFRASTRUCTURE_OUTCOME));
-    if (!optionalOutcome.isFound()) {
-      throw new InvalidRequestException(MISSING_INFRASTRUCTURE_ERROR, USER);
-    }
-
-    return (InfrastructureOutcome) optionalOutcome.getOutcome();
   }
 
   public StepResponse handleTaskException(
