@@ -153,20 +153,18 @@ public class NotificationSettingsServiceImpl implements NotificationSettingsServ
   @VisibleForTesting
   List<String> resolveUserGroups(
       NotificationChannelType notificationChannelType, List<String> notificationSetting, long expressionFunctorToken) {
-    if (!notificationChannelType.equals(NotificationChannelType.EMAIL)) {
-      if (!notificationSetting.isEmpty()) {
-        if (notificationSetting.get(0).startsWith(EXPR_START) && notificationSetting.get(0).endsWith(EXPR_END)) {
-          if (!VALID_EXPRESSION_PATTERN.matcher(notificationSetting.get(0)).matches()) {
-            throw new InvalidRequestException(INVALID_EXPRESSION_EXCEPTION);
-          }
-          log.info("Resolving UserGroup secrets expression");
-          SecretExpressionEvaluator evaluator = new SecretExpressionEvaluator(expressionFunctorToken);
-          Object resolvedExpressions = evaluator.resolve(notificationSetting, true);
-          if (resolvedExpressions == null) {
-            throw new InvalidRequestException(INVALID_EXPRESSION_EXCEPTION);
-          }
-          return (List<String>) resolvedExpressions;
+    if (!notificationChannelType.equals(NotificationChannelType.EMAIL) && !notificationSetting.isEmpty()) {
+      if (notificationSetting.get(0).startsWith(EXPR_START) && notificationSetting.get(0).endsWith(EXPR_END)) {
+        if (!VALID_EXPRESSION_PATTERN.matcher(notificationSetting.get(0)).matches()) {
+          throw new InvalidRequestException(INVALID_EXPRESSION_EXCEPTION);
         }
+        log.info("Resolving UserGroup secrets expression");
+        SecretExpressionEvaluator evaluator = new SecretExpressionEvaluator(expressionFunctorToken);
+        Object resolvedExpressions = evaluator.resolve(notificationSetting, true);
+        if (resolvedExpressions == null) {
+          throw new InvalidRequestException(INVALID_EXPRESSION_EXCEPTION);
+        }
+        return (List<String>) resolvedExpressions;
       }
     }
     return notificationSetting;
