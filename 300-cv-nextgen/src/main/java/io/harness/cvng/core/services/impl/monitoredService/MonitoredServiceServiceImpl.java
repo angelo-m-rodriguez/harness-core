@@ -1150,13 +1150,10 @@ public class MonitoredServiceServiceImpl implements MonitoredServiceService {
                                                         .projectIdentifier(projectParams.getProjectIdentifier())
                                                         .monitoredServiceIdentifier(identifier)
                                                         .build();
-    MonitoredServiceDTO monitoredServiceDTO = getMonitoredServiceDTO(monitoredServiceParams);
-    monitoredServiceDTO.setEnabled(monitoredService.isEnabled());
+    MonitoredServiceDTO currentMonitoredServiceDTO = getMonitoredServiceDTO(monitoredServiceParams);
+    currentMonitoredServiceDTO.setEnabled(monitoredService.isEnabled());
     MonitoredServiceYamlDTO oldMonitoredServiceYamlDTO =
-        MonitoredServiceYamlDTO.builder().monitoredServiceDTO(monitoredServiceDTO).build();
-    monitoredServiceDTO.setEnabled(monitoredService.isEnabled());
-    MonitoredServiceYamlDTO newMOnitoredServiceYamlDTO =
-        MonitoredServiceYamlDTO.builder().monitoredServiceDTO(monitoredServiceDTO).build();
+        MonitoredServiceYamlDTO.builder().monitoredServiceDTO(currentMonitoredServiceDTO).build();
 
     healthSourceService.setHealthMonitoringFlag(projectParams.getAccountIdentifier(), projectParams.getOrgIdentifier(),
         projectParams.getProjectIdentifier(), monitoredService.getIdentifier(),
@@ -1166,11 +1163,17 @@ public class MonitoredServiceServiceImpl implements MonitoredServiceService {
         hPersistence.createQuery(MonitoredService.class).filter(MonitoredServiceKeys.uuid, monitoredService.getUuid()),
         hPersistence.createUpdateOperations(MonitoredService.class).set(MonitoredServiceKeys.enabled, enable));
 
+    MonitoredServiceDTO newMonitoredServiceDTO = getMonitoredServiceDTO(monitoredServiceParams);
+    MonitoredService newMonitoredService = getMonitoredService(projectParams, identifier);
+    newMonitoredServiceDTO.setEnabled(newMonitoredService.isEnabled());
+    MonitoredServiceYamlDTO newMonitoredServiceYamlDTO =
+        MonitoredServiceYamlDTO.builder().monitoredServiceDTO(newMonitoredServiceDTO).build();
+
     outboxService.save(MonitoredServiceToggleEvent.builder()
                            .resourceName(monitoredService.getName())
                            .accountIdentifier(monitoredService.getAccountId())
                            .oldMonitoredServiceYamlDTO(oldMonitoredServiceYamlDTO)
-                           .newMonitoredServiceYamlDTO(newMOnitoredServiceYamlDTO)
+                           .newMonitoredServiceYamlDTO(newMonitoredServiceYamlDTO)
                            .monitoredServiceIdentifier(monitoredService.getIdentifier())
                            .orgIdentifier(monitoredService.getOrgIdentifier())
                            .projectIdentifier(monitoredService.getProjectIdentifier())
