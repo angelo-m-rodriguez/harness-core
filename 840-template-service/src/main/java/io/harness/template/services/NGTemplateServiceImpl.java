@@ -304,13 +304,14 @@ public class NGTemplateServiceImpl implements NGTemplateService {
     }
 
     if (templateToDelete == null) {
-      throw new InvalidRequestException(
-          getMessageDoesNotExist(accountId, orgIdentifier, projectIdentifier, templateIdentifier, deleteVersionLabel));
+      throw new InvalidRequestException(format("Template with identifier [%s] and versionLabel [%s] %s does not exist.",
+          templateIdentifier, deleteVersionLabel, getMessageHelper(accountId, orgIdentifier, projectIdentifier)));
     }
     if (stableTemplate != null && stableTemplate.getVersionLabel().equals(deleteVersionLabel)
         && templateEntities.size() != 1) {
-      throw new InvalidRequestException(getMessageCannotDeleteStable(
-          accountId, orgIdentifier, projectIdentifier, templateIdentifier, deleteVersionLabel));
+      throw new InvalidRequestException(
+          format("Template with identifier [%s] and versionLabel [%s] %s cannot delete the stable template.",
+              templateIdentifier, deleteVersionLabel, getMessageHelper(accountId, orgIdentifier, projectIdentifier)));
     }
 
     return deleteMultipleTemplatesHelper(accountId, orgIdentifier, projectIdentifier,
@@ -337,50 +338,25 @@ public class NGTemplateServiceImpl implements NGTemplateService {
 
     if (stableTemplate != null && deleteTemplateVersions.contains(stableTemplate.getVersionLabel())
         && !canDeleteStableTemplate) {
-      throw new InvalidRequestException(getMessageCannotDeleteStable(
-          accountId, orgIdentifier, projectIdentifier, templateIdentifier, stableTemplate.getVersionLabel()));
+      throw new InvalidRequestException(
+          format("Template with identifier [%s] and versionLabel [%s] %s cannot delete the stable template.",
+              templateIdentifier, stableTemplate.getVersionLabel(),
+              getMessageHelper(accountId, orgIdentifier, projectIdentifier)));
     }
 
     return deleteMultipleTemplatesHelper(accountId, orgIdentifier, projectIdentifier, templateToDeleteList, null,
         comments, canDeleteStableTemplate, stableTemplate);
   }
 
-  private String getMessageCannotDeleteStable(String accountId, String orgIdentifier, String projectIdentifier,
-      String templateIdentifier, String deleteVersionLabel) {
+  private String getMessageHelper(String accountId, String orgIdentifier, String projectIdentifier) {
     if (projectIdentifier != null) {
-      return format(
-          "Template with identifier [%s] and versionLabel [%s] under Project[%s], Organization [%s], Account [%s] cannot delete the stable template",
-          templateIdentifier, deleteVersionLabel, projectIdentifier, orgIdentifier, accountId);
+      return format("under Project[%s], Organization [%s], Account [%s]", projectIdentifier, orgIdentifier, accountId);
     } else if (orgIdentifier != null) {
-      return format(
-          "Template with identifier [%s] and versionLabel [%s] under Organization [%s], Account [%s] cannot delete the stable template",
-          templateIdentifier, deleteVersionLabel, orgIdentifier, accountId);
+      return format("under Organization [%s], Account [%s]", orgIdentifier, accountId);
     } else if (accountId != null) {
-      return format(
-          "Template with identifier [%s] and versionLabel [%s] under Account [%s] cannot delete the stable template",
-          templateIdentifier, deleteVersionLabel, accountId);
+      return format("under Account [%s]", accountId);
     } else {
-      return format("Template with identifier [%s] and versionLabel [%s] cannot delete the stable template",
-          templateIdentifier, deleteVersionLabel);
-    }
-  }
-
-  private String getMessageDoesNotExist(String accountId, String orgIdentifier, String projectIdentifier,
-      String templateIdentifier, String deleteVersionLabel) {
-    if (projectIdentifier != null) {
-      return format(
-          "Template with identifier [%s] and versionLabel [%s] under Project[%s], Organization [%s], Account [%s] does not exist.",
-          templateIdentifier, deleteVersionLabel, projectIdentifier, orgIdentifier, accountId);
-    } else if (orgIdentifier != null) {
-      return format(
-          "Template with identifier [%s] and versionLabel [%s] under Organization [%s], Account [%s] does not exist.",
-          templateIdentifier, deleteVersionLabel, orgIdentifier, accountId);
-    } else if (accountId != null) {
-      return format("Template with identifier [%s] and versionLabel [%s] under Account [%s] does not exist.",
-          templateIdentifier, deleteVersionLabel, accountId);
-    } else {
-      return format("Template with identifier [%s] and versionLabel [%s] does not exist.", templateIdentifier,
-          deleteVersionLabel);
+      return "cannot delete the stable template";
     }
   }
 
