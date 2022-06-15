@@ -356,7 +356,7 @@ public class NGTemplateServiceImpl implements NGTemplateService {
     } else if (accountId != null) {
       return format("under Account [%s]", accountId);
     } else {
-      return "cannot delete the stable template";
+      return "";
     }
   }
 
