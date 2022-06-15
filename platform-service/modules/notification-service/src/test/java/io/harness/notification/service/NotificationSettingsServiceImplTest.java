@@ -34,11 +34,11 @@ public class NotificationSettingsServiceImplTest extends CategoryTest {
   @Mock private NotificationSettingRepository notificationSettingRepository;
   @Mock private SmtpConfigClient smtpConfigClient;
   private NotificationSettingsServiceImpl notificationSettingsService;
-  private final static String SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/TL81600E8/B027JT97D5X/";
-  private final static String SLACK_SECRET_1 = "<+secrets.getValue('SlackWebhookUrlSecret1')>";
-  private final static String SLACK_SECRET_2 = "<+secrets.getValue('SlackWebhookUrlSecret2')>";
-  private final static String SLACK_SECRET_3 = "<+secrets.getValue(\"SlackWebhookUrlSecret3\")>";
-  private final static String PAGERDUTY_SECRET = "<+secrets.getValue('PagerDutyWebhookUrlSecret')>";
+  private static final String SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/TL81600E8/B027JT97D5X/";
+  private static final String SLACK_SECRET_1 = "<+secrets.getValue('SlackWebhookUrlSecret1')>";
+  private static final String SLACK_SECRET_2 = "<+secrets.getValue('SlackWebhookUrlSecret2')>";
+  private static final String SLACK_SECRET_3 = "<+secrets.getValue(\"SlackWebhookUrlSecret3\")>";
+  private static final String PAGERDUTY_SECRET = "<+secrets.getValue('PagerDutyWebhookUrlSecret')>";
   private long expressionFunctorToken;
 
   @Before
