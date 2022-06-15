@@ -346,11 +346,11 @@ public class NGTemplateServiceImpl implements NGTemplateService {
   }
 
   private String getMessageHelper(String accountId, String orgIdentifier, String projectIdentifier) {
-    if (StringUtils.isNotEmpty(projectIdentifier)) {
+    if (EmptyPredicate.isNotEmpty(projectIdentifier)) {
       return format("under Project[%s], Organization [%s], Account [%s]", projectIdentifier, orgIdentifier, accountId);
-    } else if (StringUtils.isNotEmpty(orgIdentifier)) {
+    } else if (EmptyPredicate.isNotEmpty(orgIdentifier)) {
       return format("under Organization [%s], Account [%s]", orgIdentifier, accountId);
-    } else if (StringUtils.isNotEmpty(accountId)) {
+    } else if (EmptyPredicate.isNotEmpty(accountId)) {
       return format("under Account [%s]", accountId);
     } else {
       return "";
