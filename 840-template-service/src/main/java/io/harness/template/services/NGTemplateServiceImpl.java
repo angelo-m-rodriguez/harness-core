@@ -302,7 +302,6 @@ public class NGTemplateServiceImpl implements NGTemplateService {
         stableTemplate = templateEntity;
       }
     }
-
     if (templateToDelete == null) {
       throw new InvalidRequestException(format("Template with identifier [%s] and versionLabel [%s] %s does not exist.",
           templateIdentifier, deleteVersionLabel, getMessageHelper(accountId, orgIdentifier, projectIdentifier)));
@@ -313,7 +312,6 @@ public class NGTemplateServiceImpl implements NGTemplateService {
           format("Template with identifier [%s] and versionLabel [%s] %s cannot delete the stable template.",
               templateIdentifier, deleteVersionLabel, getMessageHelper(accountId, orgIdentifier, projectIdentifier)));
     }
-
     return deleteMultipleTemplatesHelper(accountId, orgIdentifier, projectIdentifier,
         Collections.singletonList(templateToDelete), version, comments, templateEntities.size() == 1, stableTemplate);
   }
@@ -335,7 +333,6 @@ public class NGTemplateServiceImpl implements NGTemplateService {
         stableTemplate = templateEntity;
       }
     }
-
     if (stableTemplate != null && deleteTemplateVersions.contains(stableTemplate.getVersionLabel())
         && !canDeleteStableTemplate) {
       throw new InvalidRequestException(
@@ -343,17 +340,16 @@ public class NGTemplateServiceImpl implements NGTemplateService {
               templateIdentifier, stableTemplate.getVersionLabel(),
               getMessageHelper(accountId, orgIdentifier, projectIdentifier)));
     }
-
     return deleteMultipleTemplatesHelper(accountId, orgIdentifier, projectIdentifier, templateToDeleteList, null,
         comments, canDeleteStableTemplate, stableTemplate);
   }
 
   private String getMessageHelper(String accountId, String orgIdentifier, String projectIdentifier) {
-    if (projectIdentifier != null) {
+    if (projectIdentifier != null && !projectIdentifier.isEmpty()) {
       return format("under Project[%s], Organization [%s], Account [%s]", projectIdentifier, orgIdentifier, accountId);
-    } else if (orgIdentifier != null) {
+    } else if (orgIdentifier != null && !orgIdentifier.isEmpty()) {
       return format("under Organization [%s], Account [%s]", orgIdentifier, accountId);
-    } else if (accountId != null) {
+    } else if (accountId != null && !accountId.isEmpty()) {
       return format("under Account [%s]", accountId);
     } else {
       return "";
