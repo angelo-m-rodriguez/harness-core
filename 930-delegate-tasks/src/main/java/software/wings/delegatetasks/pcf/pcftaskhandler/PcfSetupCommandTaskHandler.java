@@ -127,6 +127,7 @@ public class PcfSetupCommandTaskHandler extends PcfCommandTaskHandler {
     File workingDirectory = null;
     Deque<CfAppRenameInfo> renames = new ArrayDeque<>();
     CfRequestConfig cfRequestConfig = null;
+    ApplicationDetail newApplication = null;
 
     try {
       executionLogCallback = logStreamingTaskClient.obtainLogCallback(CheckExistingApps);
@@ -267,7 +268,7 @@ public class PcfSetupCommandTaskHandler extends PcfCommandTaskHandler {
       // Update pcfRequestConfig with details to create application
       updatePcfRequestConfig(cfCommandSetupRequest, cfRequestConfig, newReleaseName);
       // create PCF Application
-      ApplicationDetail newApplication = createAppAndPrintDetails(executionLogCallback, requestData);
+      newApplication = createAppAndPrintDetails(executionLogCallback, requestData);
       renames.clear();
 
       List<CfAppSetupTimeDetails> downsizeAppDetails =
@@ -309,7 +310,7 @@ public class PcfSetupCommandTaskHandler extends PcfCommandTaskHandler {
           "\n\n ----------  PCF Setup process failed to complete successfully", ERROR, CommandExecutionStatus.FAILURE);
 
       handleAppRenameRevert(
-          renames, cfRequestConfig, cfCommandSetupRequest.getReleaseNamePrefix(), executionLogCallback);
+          newApplication, renames, cfRequestConfig, cfCommandSetupRequest.getReleaseNamePrefix(), executionLogCallback);
 
       Misc.logAllMessages(sanitizedException, executionLogCallback);
       return CfCommandExecutionResponse.builder()
@@ -344,11 +345,17 @@ public class PcfSetupCommandTaskHandler extends PcfCommandTaskHandler {
         initialInstanceCount != null ? initialInstanceCount : 0, isEmpty(urls) ? Collections.emptyList() : urls);
   }
 
-  private void handleAppRenameRevert(Deque<CfAppRenameInfo> renames, CfRequestConfig cfRequestConfig,
-      String releaseNamePrefix, LogCallback logCallback) {
+  private void handleAppRenameRevert(ApplicationDetail newApplication, Deque<CfAppRenameInfo> renames,
+      CfRequestConfig cfRequestConfig, String releaseNamePrefix, LogCallback logCallback) {
     try {
       if (null != cfRequestConfig && !renames.isEmpty()) {
         logCallback.saveExecutionLog("\n\n Reverting App names");
+        if (newApplication != null) {
+          String cfRequestConfigAppName = cfRequestConfig.getApplicationName();
+          cfRequestConfig.setApplicationName(newApplication.getName());
+          pcfDeploymentManager.deleteApplication(cfRequestConfig);
+          cfRequestConfig.setApplicationName(cfRequestConfigAppName);
+        }
         List<ApplicationSummary> releases =
             pcfDeploymentManager.getPreviousReleases(cfRequestConfig, releaseNamePrefix);
         Set<String> ids = releases.stream().map(ApplicationSummary::getId).collect(Collectors.toSet());
@@ -364,8 +371,11 @@ public class PcfSetupCommandTaskHandler extends PcfCommandTaskHandler {
       }
     } catch (Exception e) {
       log.error(PIVOTAL_CLOUD_FOUNDRY_LOG_PREFIX + "Exception in reverting app names", e);
-      logCallback.saveExecutionLog(
-          "\n\n ----------  Failed to revert app names", ERROR, CommandExecutionStatus.FAILURE);
+      logCallback.saveExecutionLog(new StringBuilder()
+                                       .append("\n\n ----------  Failed to revert app names")
+                                       .append(ExceptionUtils.getMessage(e))
+                                       .toString(),
+          ERROR, CommandExecutionStatus.FAILURE);
     }
   }
 
