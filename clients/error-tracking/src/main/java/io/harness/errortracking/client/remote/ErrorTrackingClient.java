@@ -15,7 +15,7 @@ import retrofit2.http.GET;
 import retrofit2.http.Query;
 
 public interface ErrorTrackingClient {
-  @GET("dashboard/agentConfig") Call<ErrorTrackingDefaultAgentConfig> getDefaultAgentConfig(
+  @GET("agent/config") Call<ErrorTrackingDefaultAgentConfig> getDefaultAgentConfig(
       @Query(value = NGCommonEntityConstants.ACCOUNT_KEY) String accountIdentifier,
       @Query(value = NGCommonEntityConstants.ORG_KEY) String orgIdentifier,
       @Query(value = NGCommonEntityConstants.PROJECT_KEY) String projectIdentifier);
